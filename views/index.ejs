@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+    <meta name="Evacuation Simulator" content="">
+    <meta name="Emmanuel Kyeyune" content="">
+
+    <title>Evacuation Simulator</title>
+
+    <!-- Bootstrap core CSS -->
+    <link href="/vendor/bootstrap/css/bootstrap.min.css" rel="stylesheet">
+
+
+    <!-- Custom fonts for this template -->
+    <link href="/vendor/font-awesome/css/fontawesome-all.css" rel="stylesheet" type="text/css">
+    <link href='https://fonts.googleapis.com/css?family=Open+Sans:300italic,400italic,600italic,700italic,800italic,400,300,600,700,800' rel='stylesheet' type='text/css'>
+    <link href='https://fonts.googleapis.com/css?family=Merriweather:400,300,300italic,400italic,700,700italic,900,900italic' rel='stylesheet' type='text/css'>
+    <link href="https://fonts.googleapis.com/css?family=Inconsolata" rel="stylesheet">
+
+    <!-- Plugin CSS -->
+    <!--<link href="/vendor/magnific-popup/magnific-popup.css" rel="stylesheet">-->
+    <link href="/vendor/iziModal/1.5.1/css/iziModal.min.css" rel="stylesheet">
+
+    <!-- Bootstrap core JavaScript -->
+    <script src="/vendor/jquery/jquery.min.js"></script>
+    <script src="/vendor/bootstrap/js/bootstrap.bundle.min.js"></script>
+
+    <!-- Plugin JavaScript -->
+    <script src="/vendor/jquery-easing/jquery.easing.min.js"></script>
+    <script src="/vendor/scrollreveal/scrollreveal.min.js"></script>
+    <!--<script src="/vendor/magnific-popup/jquery.magnific-popup.min.js"></script>-->
+    <script src="/vendor/iziModal/1.5.1/js/iziModal.min.js"></script>
+
+    <!-- Custom scripts for this template -->
+    <script src="/js/creative.min.js"></script>
+
+    <!-- Custom styles for this template -->
+    <link href="/css/creative.css" rel="stylesheet">
+    <link href="/css/inputs.css" rel="stylesheet">
+    <link href="/css/style.css" rel="stylesheet">
+    <script src="/js/pixi.min.js"></script>
+    <script src="/js/tink.js"></script>
+
+</head>
+
+<body id="page-top" oncontextmenu="return false;" >
+<script type="text/javascript">
+    let type = "WebGL"
+    if(!PIXI.utils.isWebGLSupported()){
+        type = "canvas"
+    }
+    PIXI.utils.sayHello(type)
+</script>
+
+<!-- Navigation -->
+<nav class="navbar navbar-expand-lg navbar-light static-top" id="mainNav">
+    <div class="container">
+        <a class="navbar-brand js-scroll-trigger" href="#page-top">Evacuation Simulator</a>
+        <button class="navbar-toggler navbar-toggler-right" type="button" data-toggle="collapse" data-target="#navbarResponsive" aria-controls="navbarResponsive" aria-expanded="false" aria-label="Toggle navigation">
+            <span class="navbar-toggler-icon"></span>
+        </button>
+        <div class="collapse navbar-collapse" id="navbarResponsive">
+            <ul class="navbar-nav ml-auto">
+                <li class="nav-item">
+                    <a class="nav-link js-scroll-trigger" href="#about">About</a>
+                </li>
+            </ul>
+        </div>
+    </div>
+</nav>
+
+<section class="masthead text-center text-white d-flex">
+    <div class="container my-auto">
+        <div class="row">
+            <div class="esm-flex">
+                <div id="app-render" class="esm-render">
+                </div>
+                <div class="card esm-card" style="width:100%;">
+                    <div class="card-body">
+                        <h5 class="card-title">CREATE SCENARIO</h5>
+                        <h6 class="card-subtitle mb-2 ">click on an object below to add it to the scenario</h6>
+                        <div class="input-container esm-inputs-flex">
+                            <div class="column-esm">
+                                <div class="esm-radio-option focus-esm">
+                                    <input id="objectsel5" name="objectsel" type="radio" class="with-font cursor" value="cursor" checked/>
+                                    <label for="objectsel5">cursor</label>
+                                </div>
+                                <div class="esm-radio-option">
+                                    <input id="objectsel1" name="objectsel" type="radio" class="with-font user" value="evacuee" />
+                                    <label for="objectsel1">evacuee</label>
+                                </div>
+                                <div class="esm-radio-option">
+                                    <input id="objectsel3" name="objectsel" type="radio" class="with-font sensor" value="sensor"/>
+                                    <label for="objectsel3">sensor</label>
+                                </div>
+                            </div>
+                            <div class="column-esm">
+                                <div class="esm-radio-option">
+                                    <input id="objectsel6" name="objectsel" type="radio" class="with-font remove" value="remove" />
+                                    <label for="objectsel6">remove</label>
+                                </div>
+                                <div class="esm-radio-option">
+                                    <input id="objectsel2" name="objectsel"type="radio" class="with-font cube" value="wall"/>
+                                    <label for="objectsel2">wall</label>
+                                </div>
+                                <!--<div class="esm-radio-option">-->
+                                <!--<input id="objectsel7" name="objectsel"type="radio" class="with-font cubes" value="walls"/>-->
+                                <!--<label for="objectsel7">walls</label>-->
+                                <!--</div>-->
+
+                                <div class="esm-radio-option">
+                                    <input id="objectsel4" name="objectsel" type="radio" class="with-font fire" value="fire"/>
+                                    <label for="objectsel4">fire</label>
+                                </div>
+                            </div>
+                        </div>
+                        <hr>
+                        <h5 class="card-title">LOAD / SAVE SCENARIO</h5>
+                        <h6 class="card-subtitle mb-2 ">load or save a scenario</h6>
+                        <div class="input-container esm-inputs-flex">
+                            <div class="column-esm">
+                                <button type="button" class="esm-radio-option esm-btn" id="load-btn">
+                                    <span class="far fa-folder-open" style="font-size: 2rem;" aria-hidden="true"></span>
+                                    open
+                                </button>
+                            </div>
+                            <div class="column-esm">
+                                <button type="button" class="esm-radio-option esm-btn" id="save-btn">
+                                    <span class="far fa-save" style="font-size: 2rem;" aria-hidden="true"></span>
+                                    save
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<section class="bg-primary" id="about">
+    <div class="container">
+        <div class="row">
+            <div class="col-lg-8 mx-auto text-center">
+                <h2 class="section-heading text-white">We've got what you need!</h2>
+                <hr class="light my-4">
+                <p class="text-faded mb-4">Start Bootstrap has everything you need to get your new website up and running in no time! All of the templates and themes on Start Bootstrap are open source, free to download, and easy to use. No strings attached!</p>
+                <a class="btn btn-light btn-xl js-scroll-trigger" href="#services">Get Started!</a>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Modal structure -->
+<div id="save-modal" data-iziModal-title="Save Scene"  data-iziModal-subtitle="Save the positions of walls and sensors"  data-iziModal-icon="far fa-save"> <!-- data-iziModal-fullscreen="true"  data-iziModal-title="Welcome"  data-iziModal-subtitle="Subtitle"  data-iziModal-icon="icon-home" -->
+    <form id="scene-save-form" class="form-inline" style="padding: 3rem">
+        <label class="sr-only" for="inlineFormInputText">Username</label>
+        <div class="input-group mb-2 mr-sm-2 mb-sm-0">
+            <input type="text" class="form-control esm-modal-input" id="inlineFormInputText" placeholder="scenename (no spaces)">
+        </div>
+        <button id="save-submit" type="submit" class="btn btn-primary esm-modal-btn">Submit</button>
+    </form>
+</div>
+
+<script src="/js/bundle.js"></script>
+</body>
+
+</html>

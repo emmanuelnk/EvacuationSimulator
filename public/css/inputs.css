@@ -1,0 +1,127 @@
+@import url(../vendor/font-awesome/css/font-awesome.css);
+
+.input-container {
+    text-align:left;
+}
+
+.esm-inputs-flex {
+    display: flex;
+    flex-direction: row;
+    flex-wrap: wrap;
+    justify-content: space-between;
+}
+
+.esm-modal-btn {
+    border-radius: 0;
+    background: transparent;
+    color: black;
+    border: black solid 2px;
+}
+
+.esm-modal-input {
+    border: black solid 2px;
+    border-radius: 0;
+    background: rgba(0,0,0,0.6);
+    color: rgba(255,255,255,1);
+}
+
+.esm-modal-input:focus {
+    border-radius: 0;
+    background: rgba(0,0,0,0.6);
+    color: rgba(255,255,255,1);
+}
+
+.esm-modal-input::-webkit-input-placeholder {
+    color: rgba(255,255,255,0.7);
+}
+
+.esm-radio-option {
+    margin: 0.3rem 0.4rem 0.5rem 0.1rem;
+    padding: 0 0.5rem;
+    border: solid white 2px;
+}
+
+.esm-btn {
+    background: transparent;
+    color: white;
+    width: 90%;
+    padding: 0.5rem;
+}
+
+input[type=radio].with-font,
+input[type=checkbox].with-font {
+    border: 0;
+    clip: rect(0 0 0 0);
+    height: 1px;
+    margin: -1px;
+    overflow: hidden;
+    padding: 0;
+    position: absolute;
+    width: 1px;
+}
+
+input[type=radio].with-font ~ label:before,
+input[type=checkbox].with-font ~ label:before {
+    font-family: FontAwesome;
+    display: inline-block;
+    content: "\f1db";
+    letter-spacing: 10px;
+    font-size: 2em;
+    color: white;
+    width: 1.4em;
+}
+
+
+input[type=checkbox].with-font ~ label:before {
+    content: "\f096";
+}
+input[type=checkbox].with-font:checked ~ label:before {
+    content: "\f046";
+    color: crimson;
+}
+input[type=radio].with-font:checked ~ label:before,
+input[type=checkbox].with-font:checked ~ label:before,
+input[type=radio].with-font:checked ~ label,
+input[type=checkbox].with-font:checked ~ label
+{
+    color: crimson;
+}
+
+
+input[type=radio].cursor ~ label:before {
+    content: "\f245";
+}
+
+input[type=radio].remove ~ label:before {
+    content: "\f05c";
+}
+
+input[type=radio].user ~ label:before {
+    content: "\f007";
+}
+
+input[type=radio].cube ~ label:before {
+    content: "\f1b2";"\f1b3"
+}
+
+input[type=radio].cubes ~ label:before {
+    content: "\f1b3";
+}
+
+input[type=radio].sensor ~ label:before {
+    content: "\f069"
+}
+
+input[type=radio].fire~ label:before {
+    content: "\f06d"
+}
+
+input[type=radio].with-font:checked ~ label:before {
+    color: crimson;
+    font-size: 2em;
+    letter-spacing: 5px;
+}
+
+.focus-esm {
+    border: solid 2px crimson;
+}

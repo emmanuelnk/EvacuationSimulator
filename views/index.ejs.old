@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title><%= title %></title>
+    <link rel='stylesheet' href='/css/style.css' />
+    <script src="/vendor/jquery/jquery.min.js"></script>
+    <script src="/js/pixi.min.js"></script>
+    <script src="/js/tink.js"></script>
+
+  </head>
+  <body>
+  <script type="text/javascript">
+      let type = "WebGL"
+      if(!PIXI.utils.isWebGLSupported()){
+          type = "canvas"
+      }
+      PIXI.utils.sayHello(type)
+  </script>
+  <script src="/js/bundle.js"></script>
+  </body>
+</html>
