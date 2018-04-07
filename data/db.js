@@ -8,8 +8,9 @@ const db = new Sequelize('whistle', null, null, {
 });
 
 const scenarioModel = db.define('scenarioModel', {
-    name: { type: Sequelize.STRING },
-    mainGrid: {type: Sequelize.BLOB}
+    filename: { type: Sequelize.STRING },
+    sceneArr: {type: Sequelize.STRING}
 });
 
+db.scenarioModel = db.models.scenarioModel;
 module.exports = db;

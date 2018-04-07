@@ -39,6 +39,7 @@
     <!-- Custom styles for this template -->
     <link href="/css/creative.css" rel="stylesheet">
     <link href="/css/inputs.css" rel="stylesheet">
+    <link href="/css/nav-tabs.css" rel="stylesheet">
     <link href="/css/style.css" rel="stylesheet">
     <script src="/js/pixi.min.js"></script>
     <script src="/js/tink.js"></script>
@@ -78,59 +79,99 @@
                 <div id="app-render" class="esm-render">
                 </div>
                 <div class="card esm-card" style="width:100%;">
-                    <div class="card-body">
-                        <h5 class="card-title">CREATE SCENARIO</h5>
-                        <h6 class="card-subtitle mb-2 ">click on an object below to add it to the scenario</h6>
-                        <div class="input-container esm-inputs-flex">
-                            <div class="column-esm">
-                                <div class="esm-radio-option focus-esm">
-                                    <input id="objectsel5" name="objectsel" type="radio" class="with-font cursor" value="cursor" checked/>
-                                    <label for="objectsel5">cursor</label>
-                                </div>
-                                <div class="esm-radio-option">
-                                    <input id="objectsel1" name="objectsel" type="radio" class="with-font user" value="evacuee" />
-                                    <label for="objectsel1">evacuee</label>
-                                </div>
-                                <div class="esm-radio-option">
-                                    <input id="objectsel3" name="objectsel" type="radio" class="with-font sensor" value="sensor"/>
-                                    <label for="objectsel3">sensor</label>
-                                </div>
+                    <div id="esm-accordion">
+                        <div class="card">
+                            <div class="card-header" id="headingOne">
+                                <h5 class="mb-0">
+                                    <button class="esm-accordion-header" data-toggle="collapse" data-target="#collapseOne" aria-expanded="true" aria-controls="collapseOne">
+                                        CREATE SCENARIO
+                                    </button>
+                                </h5>
                             </div>
-                            <div class="column-esm">
-                                <div class="esm-radio-option">
-                                    <input id="objectsel6" name="objectsel" type="radio" class="with-font remove" value="remove" />
-                                    <label for="objectsel6">remove</label>
-                                </div>
-                                <div class="esm-radio-option">
-                                    <input id="objectsel2" name="objectsel"type="radio" class="with-font cube" value="wall"/>
-                                    <label for="objectsel2">wall</label>
-                                </div>
-                                <!--<div class="esm-radio-option">-->
-                                <!--<input id="objectsel7" name="objectsel"type="radio" class="with-font cubes" value="walls"/>-->
-                                <!--<label for="objectsel7">walls</label>-->
-                                <!--</div>-->
 
-                                <div class="esm-radio-option">
-                                    <input id="objectsel4" name="objectsel" type="radio" class="with-font fire" value="fire"/>
-                                    <label for="objectsel4">fire</label>
+                            <div id="collapseOne" class="collapse show" aria-labelledby="headingOne" data-parent="#accordion">
+                                <div class="card-body">
+                                    <h6 class="card-subtitle mb-2 ">click on an object below to add it to the scenario</h6>
+                                    <div class="input-container esm-inputs-flex">
+                                        <div class="column-esm">
+                                            <div class="esm-radio-option focus-esm">
+                                                <input id="objectsel5" name="objectsel" type="radio" class="with-font cursor" value="cursor" checked/>
+                                                <label for="objectsel5">cursor</label>
+                                            </div>
+                                            <div class="esm-radio-option">
+                                                <input id="objectsel1" name="objectsel" type="radio" class="with-font user" value="evacuee" />
+                                                <label for="objectsel1">evacuee</label>
+                                            </div>
+                                            <div class="esm-radio-option">
+                                                <input id="objectsel3" name="objectsel" type="radio" class="with-font sensor" value="sensor"/>
+                                                <label for="objectsel3">sensor</label>
+                                            </div>
+                                            <div class="esm-radio-option" id="info-option">
+                                                <input id="objectsel8" name="objectsel"type="radio" class="with-font esinfo" value="info"/>
+                                                <label for="objectsel8">info</label>
+                                            </div>
+                                        </div>
+                                        <div class="column-esm">
+                                            <div class="esm-radio-option">
+                                                <input id="objectsel6" name="objectsel" type="radio" class="with-font remove" value="remove" />
+                                                <label for="objectsel6">remove</label>
+                                            </div>
+                                            <div class="esm-radio-option">
+                                                <input id="objectsel2" name="objectsel"type="radio" class="with-font cube" value="wall"/>
+                                                <label for="objectsel2">wall</label>
+                                            </div>
+                                            <div class="esm-radio-option">
+                                            <input id="objectsel7" name="objectsel"type="radio" class="with-font cubes" value="walls"/>
+                                            <label for="objectsel7">walls</label>
+                                            </div>
+                                            <div class="esm-radio-option">
+                                                <input id="objectsel4" name="objectsel" type="radio" class="with-font fire" value="fire"/>
+                                                <label for="objectsel4">fire</label>
+                                            </div>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
                         </div>
-                        <hr>
-                        <h5 class="card-title">LOAD / SAVE SCENARIO</h5>
-                        <h6 class="card-subtitle mb-2 ">load or save a scenario</h6>
-                        <div class="input-container esm-inputs-flex">
-                            <div class="column-esm">
-                                <button type="button" class="esm-radio-option esm-btn" id="load-btn">
-                                    <span class="far fa-folder-open" style="font-size: 2rem;" aria-hidden="true"></span>
-                                    open
-                                </button>
+                        <div class="card">
+                            <div class="card-header" id="headingTwo">
+                                <h5 class="mb-0">
+                                    <button class="esm-accordion-header collapsed" data-toggle="collapse" data-target="#collapseTwo" aria-expanded="false" aria-controls="collapseTwo">
+                                        LOAD / SAVE SCENARIO
+                                    </button>
+                                </h5>
                             </div>
-                            <div class="column-esm">
-                                <button type="button" class="esm-radio-option esm-btn" id="save-btn">
-                                    <span class="far fa-save" style="font-size: 2rem;" aria-hidden="true"></span>
-                                    save
-                                </button>
+                            <div id="collapseTwo" class="collapse" aria-labelledby="headingTwo" data-parent="#accordion">
+                                <div class="card-body">
+                                    <h6 class="card-subtitle mb-2 ">load or save a scenario</h6>
+                                    <div class="input-container esm-inputs-flex">
+                                        <div class="column-esm">
+                                            <button type="button" class="esm-radio-option esm-btn" id="load-btn">
+                                                <span class="far fa-folder-open" style="font-size: 2rem;" aria-hidden="true"></span>
+                                                open
+                                            </button>
+                                        </div>
+                                        <div class="column-esm">
+                                            <button type="button" class="esm-radio-option esm-btn" id="save-btn">
+                                                <span class="far fa-save" style="font-size: 2rem;" aria-hidden="true"></span>
+                                                save
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="card">
+                            <div class="card-header" id="headingThree">
+                                <h5 class="mb-0">
+                                    <button class="esm-accordion-header collapsed" data-toggle="collapse" data-target="#collapseThree" aria-expanded="false" aria-controls="collapseThree">
+                                    </button>
+                                </h5>
+                            </div>
+                            <div id="collapseThree" class="collapse" aria-labelledby="headingThree" data-parent="#accordion">
+                                <div class="card-body">
+                                    Anim pariatur cliche reprehenderit, enim eiusmod
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -162,6 +203,60 @@
         </div>
         <button id="save-submit" type="submit" class="btn btn-primary esm-modal-btn">Submit</button>
     </form>
+</div>
+<div id="info-modal" style="min-height:80vh;" data-iziModal-title="Scene Info"  data-iziModal-subtitle="Check the info stats of the scenario"  data-iziModal-icon="fas fa-table">
+    <div class="d-flex flex-row mt-2" id="stats-menu">
+        <ul class="nav nav-tabs nav-tabs--vertical nav-tabs--left" role="navigation">
+            <li class="nav-item">
+                <a href="#stats-tab-1" class="nav-link active" data-toggle="tab" role="tab" aria-controls="stats-tab-1">> sceneArr</a>
+            </li>
+            <li class="nav-item">
+                <a href="#stats-tab-2" class="nav-link" data-toggle="tab" role="tab" aria-controls="stats-tab-2">> popn stats</a>
+            </li>
+            <li class="nav-item">
+                <a href="#stats-tab-3" class="nav-link" data-toggle="tab" role="tab" aria-controls="stats-tab-3">> network stats</a>
+            </li>
+            <li class="nav-item">
+                <a href="#stats-tab-4" class="nav-link" data-toggle="tab" role="tab" aria-controls="stats-tab-4">> misc</a>
+            </li>
+        </ul>
+        <div class="tab-content">
+            <div class="tab-pane fade show active" id="stats-tab-1" role="tabpanel">
+                <h2 class="stat-tab-h">the scene array</h2>
+                <div id="disp-scene-arr">
+
+                </div>
+            </div>
+            <div class="tab-pane fade" id="stats-tab-2" role="tabpanel">
+                <h2 class="stat-tab-h">popn stats</h2>
+            </div>
+            <div class="tab-pane fade" id="stats-tab-3" role="tabpanel">
+                <h2 class="stat-tab-h">network stats</h2>
+            </div>
+            <div class="tab-pane fade" id="stats-tab-4" role="tabpanel">
+                <h2 class="stat-tab-h">misc</h2>
+
+            </div>
+        </div>
+    </div>
+</div>
+<div id="load-modal" data-iziModal-title="Load Scenario"  data-iziModal-subtitle="Load a scenario from the database"  data-iziModal-icon="far fa-folder-open">
+<div class="row">
+    <div class="col-md-12">
+        <table id="load-data-table" class="display" style="width:100%">
+            <thead>
+            <tr>
+                <th>id</th>
+                <th>filename</th>
+                <th>date created</th>
+            </tr>
+            </thead>
+        </table>
+    </div>
+    <div class="col-md-12">
+
+    </div>
+</div>
 </div>
 
 <script src="/js/bundle.js"></script>

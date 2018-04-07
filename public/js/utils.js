@@ -21,27 +21,47 @@ export const createGroupedArray = (arr, chunkSize) => {
     return groups;
 };
 
-export const scaleArray = (arr, scale=4) => {
-    for (let i = 0, len = arr.length; i < len; i++) {
-        let a = arr[i];
-        scaleTheArray(a, scale - 1);
-    }
-    /* 2. Expand each of the a length */
-    scaleTheArray(arr, scale - 1);
+export const scaleSpread = (array, factor) => {
+    const scaled = [];
 
-    return arr;
+    for(const row of array) {
+        x = [];
+
+        for(const item of row)
+            x.push(...Array(factor).fill(item));
+
+        scaled.push(...Array(factor).fill(x));
+    }
+
+    return scaled;
 };
 
-const scaleTheArray = function (arrayToScale, nTimes) {
-    for (let idx = 0, i = 0, len = arrayToScale.length * nTimes; i < len; i++) {
-        let elem = arrayToScale[idx];
+export const scaleApply = (array, factor) => {
+    const scaled = [];
 
-        /* Insert the element into (idx + 1) */
-        arrayToScale.splice(idx + 1, 0, elem);
+    for(const row of array) {
+        let x = [];
 
-        /* Add idx for the next elements */
-        if ((i + 1) % nTimes === 0) {
-            idx += nTimes + 1;
-        }
+        for(const item of row)
+            x.push.apply(x, Array(factor).fill(item));
+
+        scaled.push.apply(scaled, Array(factor).fill(x));
     }
+
+    return scaled;
+};
+
+export const scaleConcat = (array, factor) => {
+    let scaled = [];
+
+    for(const row of array) {
+        let x = [];
+
+        for(const item of row)
+            x = x.concat(Array(factor).fill(item));
+
+        scaled = scaled.concat(Array(factor).fill(x));
+    }
+
+    return scaled;
 };

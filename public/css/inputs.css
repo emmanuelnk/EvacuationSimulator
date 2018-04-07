@@ -39,6 +39,7 @@
     margin: 0.3rem 0.4rem 0.5rem 0.1rem;
     padding: 0 0.5rem;
     border: solid white 2px;
+    color: white;
 }
 
 .esm-btn {
@@ -46,6 +47,28 @@
     color: white;
     width: 90%;
     padding: 0.5rem;
+}
+
+#esm-accordion .card {
+    background-color:transparent;
+}
+
+.esm-accordion-header {
+    font-size: 1.2rem;
+    background: none;
+    color: white;
+    border: none;
+    border-radius: 0;
+}
+
+.esm-accordion-header:focus{
+    outline: none;
+    /*color: crimson;*/
+    border-radius: 0;
+}
+
+#esm-accordion .card .card-header {
+    border-bottom: none;
 }
 
 input[type=radio].with-font,
@@ -77,19 +100,22 @@ input[type=checkbox].with-font ~ label:before {
 }
 input[type=checkbox].with-font:checked ~ label:before {
     content: "\f046";
-    color: crimson;
+    color: white;
 }
 input[type=radio].with-font:checked ~ label:before,
 input[type=checkbox].with-font:checked ~ label:before,
 input[type=radio].with-font:checked ~ label,
 input[type=checkbox].with-font:checked ~ label
 {
-    color: crimson;
+    color: white;
 }
 
 
 input[type=radio].cursor ~ label:before {
     content: "\f245";
+}
+input[type=radio].esinfo ~ label:before {
+    content: "\f05a";
 }
 
 input[type=radio].remove ~ label:before {
@@ -117,11 +143,32 @@ input[type=radio].fire~ label:before {
 }
 
 input[type=radio].with-font:checked ~ label:before {
-    color: crimson;
+    color: white;
     font-size: 2em;
     letter-spacing: 5px;
 }
 
 .focus-esm {
-    border: solid 2px crimson;
+    border: solid 2px white;
+    background:crimson;
+    color: white;
+}
+
+div#disp-scene-arr {
+    display: flex;
+    justify-content: center;
+    padding: 2rem;
+}
+div#disp-scene-arr td {
+    padding: 0px 6px;
+    font-size: 8px;
+
+}
+div#disp-scene-arr table {
+    border: solid rgba(0,0,0,0.5);
+    padding: 1rem;
+}
+
+div#disp-scene-arr td, div#disp-scene-arr tr {
+    border: solid rgba(0,0,0,0.5) 1px;
 }

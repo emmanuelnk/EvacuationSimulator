@@ -8,6 +8,7 @@ const sassMiddleware = require('node-sass-middleware');
 
 const index = require('./routes/index');
 const saveScene = require('./routes/scenario.save');
+const loadScene = require('./routes/scenario.load');
 const users = require('./routes/users');
 
 const app = express();
@@ -33,6 +34,7 @@ app.use(express.static(path.join(__dirname, 'public')));
 app.use('/', index);
 app.use('/users', users);
 app.use('/save-scene', saveScene);
+app.use('/load-scene', loadScene);
 
 // catch 404 and forward to error handler
 app.use(function(req, res, next) {
