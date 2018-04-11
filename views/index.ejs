@@ -22,6 +22,16 @@
     <!-- Plugin CSS -->
     <!--<link href="/vendor/magnific-popup/magnific-popup.css" rel="stylesheet">-->
     <link href="/vendor/iziModal/1.5.1/css/iziModal.min.css" rel="stylesheet">
+    <link href="/css/datatables.min.css" rel="stylesheet">
+
+    <!-- Custom styles for this template -->
+    <link href="/css/animate.css" rel="stylesheet">
+    <link href="/css/simple-scrollbar.css" rel="stylesheet">
+    <link href="/css/creative.css" rel="stylesheet">
+    <link href="/css/inputs.css" rel="stylesheet">
+    <link href="/css/nav-tabs.css" rel="stylesheet">
+    <link href="/css/messagelog.css" rel="stylesheet">
+    <link href="/css/style.css" rel="stylesheet">
 
     <!-- Bootstrap core JavaScript -->
     <script src="/vendor/jquery/jquery.min.js"></script>
@@ -32,17 +42,14 @@
     <script src="/vendor/scrollreveal/scrollreveal.min.js"></script>
     <!--<script src="/vendor/magnific-popup/jquery.magnific-popup.min.js"></script>-->
     <script src="/vendor/iziModal/1.5.1/js/iziModal.min.js"></script>
+    <script src="/js/moment.min.js"></script>
+    <script src="/js/simple-scrollbar.min.js"></script>
 
     <!-- Custom scripts for this template -->
     <script src="/js/creative.min.js"></script>
-
-    <!-- Custom styles for this template -->
-    <link href="/css/creative.css" rel="stylesheet">
-    <link href="/css/inputs.css" rel="stylesheet">
-    <link href="/css/nav-tabs.css" rel="stylesheet">
-    <link href="/css/style.css" rel="stylesheet">
     <script src="/js/pixi.min.js"></script>
     <script src="/js/tink.js"></script>
+    <script src="/js/datatables.min.js"></script>
 
 </head>
 
@@ -73,9 +80,29 @@
 </nav>
 
 <section class="masthead text-center text-white d-flex">
-    <div class="container my-auto">
-        <div class="row">
+    <div class="container-fluid">
+        <div class="row" style="justify-content:center;">
             <div class="esm-flex">
+                <div class="card esm-card" style="width:100%;margin-right: 1rem;padding: 0.5rem;">
+                    <div class="esm-accordion-header">SIM CONTROL</div>
+                    <form class="sim-control" style="margin-bottom: 2rem;">
+                        <div class="form-group">
+                            <label for="sim-select-1">Select the protocol to use</label>
+                            <select class="form-control" id="sim-select-1">
+                                <option> ESM algo</option>
+                                <option>SEND algo</option>
+                                <option>Yyuan algo</option>
+                                <option>Liu algo</option>
+                                <option>ASCT algo</option>
+                            </select>
+                        </div>
+                        <button type="submit" class="btn btn-primary sub-sim">RUN SIMULATION</button>
+                    </form>
+                    <div class="esm-accordion-header">EVENT LOG</div>
+                    <div id="messages">
+                        <div class="mc-row mc-cursor "><span class="mc-time"><span class="mc-cursor-time"></span> &lambda;</span><input class="mc-input"/></div>
+                    </div>
+                </div>
                 <div id="app-render" class="esm-render">
                 </div>
                 <div class="card esm-card" style="width:100%;">
@@ -128,6 +155,10 @@
                                                 <input id="objectsel4" name="objectsel" type="radio" class="with-font fire" value="fire"/>
                                                 <label for="objectsel4">fire</label>
                                             </div>
+                                            <div class="esm-radio-option">
+                                                <input id="objectsel9" name="objectsel" type="radio" class="with-font exit" value="exit"/>
+                                                <label for="objectsel9">exit</label>
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
@@ -164,14 +195,12 @@
                         <div class="card">
                             <div class="card-header" id="headingThree">
                                 <h5 class="mb-0">
-                                    <button class="esm-accordion-header collapsed" data-toggle="collapse" data-target="#collapseThree" aria-expanded="false" aria-controls="collapseThree">
+                                    <button class="esm-accordion-header collapsed" data-toggle="collapse" data-target="#collapseThree" aria-expanded="true" aria-controls="collapseThree">
+
                                     </button>
                                 </h5>
                             </div>
                             <div id="collapseThree" class="collapse" aria-labelledby="headingThree" data-parent="#accordion">
-                                <div class="card-body">
-                                    Anim pariatur cliche reprehenderit, enim eiusmod
-                                </div>
                             </div>
                         </div>
                     </div>
@@ -184,11 +213,11 @@
 <section class="bg-primary" id="about">
     <div class="container">
         <div class="row">
-            <div class="col-lg-8 mx-auto text-center">
-                <h2 class="section-heading text-white">We've got what you need!</h2>
-                <hr class="light my-4">
-                <p class="text-faded mb-4">Start Bootstrap has everything you need to get your new website up and running in no time! All of the templates and themes on Start Bootstrap are open source, free to download, and easy to use. No strings attached!</p>
-                <a class="btn btn-light btn-xl js-scroll-trigger" href="#services">Get Started!</a>
+            <div class="col-lg-8">
+                <h2 class="section-heading text-white">about this simulator</h2>
+                <hr class="light my-4" style="max-width: 200px;margin-left: inherit">
+                <p class="text-faded mb-4">this simulator is part of a research effort by Emmanuel N Kyeyune in finding a dynamic protocol that can be leveraged in smart buildings by wireless sensor networks. This protocol can be used to quickly generate evacuation paths based on various factors such as hazard intensity, crowd congestion, shortest path and so on.</p>
+                <a class="btn btn-light btn-xl js-scroll-trigger" style="border-radius: 0;" href="https://github.com/emmanuelnk">My Github</a>
             </div>
         </div>
     </div>
@@ -243,7 +272,8 @@
 <div id="load-modal" data-iziModal-title="Load Scenario"  data-iziModal-subtitle="Load a scenario from the database"  data-iziModal-icon="far fa-folder-open">
 <div class="row">
     <div class="col-md-12">
-        <table id="load-data-table" class="display" style="width:100%">
+        <h5 class="load-heading"> select a file to load: </h5>
+        <table id="load-data-table" class="display esm-table-select" style="width:100%;padding:0 2rem;">
             <thead>
             <tr>
                 <th>id</th>
@@ -254,7 +284,12 @@
         </table>
     </div>
     <div class="col-md-12">
-
+        <h5 class="load-heading"> selected file: <span id="err-hint" style="color:red;visibility: hidden;">can't do anything with nothing!</span></h5>
+        <div id="filename-disp"></div>
+    </div>
+    <div class="col-md-12" style="margin-bottom: 3rem;">
+        <button id="load-scene-btn" name="load-scene-btn" class="btn btn-success">Load</button>
+        <button id="del-scene-btn" name="del-scene-btn" class="btn btn-danger">Delete</button>
     </div>
 </div>
 </div>

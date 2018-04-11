@@ -71,6 +71,12 @@
     border-bottom: none;
 }
 
+.esm-table-select tbody tr:hover {
+    background: #F05F40;
+    color: white;
+    cursor: pointer;
+}
+
 input[type=radio].with-font,
 input[type=checkbox].with-font {
     border: 0;
@@ -110,6 +116,9 @@ input[type=checkbox].with-font:checked ~ label
     color: white;
 }
 
+input[type=radio].exit ~ label:before {
+    content: "\f08b";
+}
 
 input[type=radio].cursor ~ label:before {
     content: "\f245";
@@ -171,4 +180,69 @@ div#disp-scene-arr table {
 
 div#disp-scene-arr td, div#disp-scene-arr tr {
     border: solid rgba(0,0,0,0.5) 1px;
+}
+
+/*********************************************** */
+#filename-disp {
+    width: 50%;
+    border: solid black 2px;
+    border-radius: 0;
+    background: transparent;
+    margin-left: 3rem;
+    margin-bottom: 1rem;
+    height: 2.5rem;
+    padding:7px 10px;
+}
+
+#load-scene-btn {
+    background: #F05F40;
+    color: black;
+    border: black solid 2px;
+    border-radius: 0;
+    margin-left: 3rem;
+}
+
+#load-scene-btn:hover {
+    background:green;
+    color: white;
+}
+
+#del-scene-btn {
+    background: transparent;
+    color: black;
+    border: black solid 2px;
+    border-radius: 0;
+}
+
+#del-scene-btn:hover {
+    background: red;
+    color: white;
+}
+
+.load-heading {
+    margin-left: 3rem;
+    margin-top: 1rem;
+}
+
+/********************************************/
+
+#sim-select-1 option {
+    background:rgba(255,255,255,0.5);
+    color:black;
+}
+#sim-select-1 option:hover {
+    background:#F05F40;
+    color:black;
+}
+.sub-sim {
+    border-radius: 0;
+}
+.sub-sim:hover {
+    background:crimson!important;
+}
+
+#sim-select-1 {
+    background: transparent;
+    color: white;
+    border-radius: 0;
 }

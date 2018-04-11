@@ -1,0 +1,100 @@
+#messages {
+    height: 400px;
+    width: 100%;
+    background: rgba(39, 40, 34, 0.7);
+    padding: 1rem;
+    font-size: 12px;
+    overflow: auto;
+    text-align: start;
+    border: solid #F05F40 1px;
+}
+#messages .mc-row {
+    padding:0.1rem 0;
+}
+
+#messages .mc-time{
+    color: #A6E22E;
+    display:inline-block;
+    vertical-align:top;
+}
+
+#messages .mc-msg {
+    display:inline-block;
+    color:rgba(255,255,255,0.7);
+    padding-left:0.5rem;
+    vertical-align:top;
+}
+
+#messages .animated {
+    -webkit-animation-duration: 0.3s;
+    animation-duration: 0.3s;
+    -webkit-animation-fill-mode: both;
+    animation-fill-mode: both;
+}
+
+#messages .blinking-cursor {
+    font-weight: 500;
+    font-size: 12px;
+    padding: 0px 3px 3px 3px;
+    color: #A6E22E;
+    -webkit-animation: 1s blink step-end infinite;
+    -moz-animation: 1s blink step-end infinite;
+    -ms-animation: 1s blink step-end infinite;
+    -o-animation: 1s blink step-end infinite;
+    animation: 1s blink step-end infinite;
+}
+
+#messages .mc-input {
+    background: transparent;
+    border: 0;
+    color: #A6E22E;
+    caret-color: #A6E22E;
+    outline: none;
+    padding: 0 0 0 6px;
+    width: 75%;
+}
+
+@keyframes blink {
+    from, to {
+        color: transparent;
+    }
+    50% {
+        color: #A6E22E;
+    }
+}
+
+@-moz-keyframes blink {
+    from, to {
+        color: transparent;
+    }
+    50% {
+        color: #A6E22E;
+    }
+}
+
+@-webkit-keyframes blink {
+    from, to {
+        color: transparent;
+    }
+    50% {
+        color: #A6E22E;
+    }
+}
+
+@-ms-keyframes blink {
+    from, to {
+        color: transparent;
+    }
+    50% {
+        color: #A6E22E;
+    }
+}
+
+@-o-keyframes blink {
+    from, to {
+        color: transparent;
+    }
+    50% {
+        color: #A6E22E;
+    }
+}

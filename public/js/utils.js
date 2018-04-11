@@ -65,3 +65,41 @@ export const scaleConcat = (array, factor) => {
 
     return scaled;
 };
+
+export class msgConsole {
+    constructor (obj) {
+        this.div = obj.id;
+        this.animated = obj.animated;
+        this.animateCssClass = obj.animateCssClass;
+        this.showTime = obj.showTime;
+    }
+
+    msg (message) {
+        let animated = this.animated ? 'animated' : '';
+        let disp = this.showTime ? '' : 'display:none';
+        console.log('this.div', this.div);
+        let messages = document.getElementById(this.div);
+        let isScrolledToBottom = messages.scrollHeight - messages.clientHeight <= messages.scrollTop + 1;
+        let time = moment().format('HH:mm:ss');
+
+        $(`#${this.div} .mc-cursor`).before(`<div class="mc-row ${animated} ${this.animateCssClass}"><span class="mc-time"><span style=${disp}>${time}</span> &lambda;</span><span class="mc-msg">${message}</span></div>`);
+
+
+        if(isScrolledToBottom){
+            messages.scrollTop = messages.scrollHeight - messages.clientHeight;
+        }
+    }
+
+    clr (str, color) {
+        let spClr =
+            color === 'err' ? 'red' :
+                color === 'success' ? 'darkgreen' :
+                    color === 'warn' ? 'yellow' :
+                        color === 'monoorange' ? '#FD971F' :
+                            color === 'monoblue' ? '#66D9EF' :
+                                color === 'monopink' ? '#F92672' :
+                                    color === 'monogreen' ? '#A6E22E' :
+                                        color;
+        return `<span style="color:${spClr}">${str}</span>`;
+    }
+}

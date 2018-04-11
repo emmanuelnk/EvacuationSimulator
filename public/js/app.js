@@ -2,27 +2,59 @@
 // imports
 const easystarjs = require('easystarjs');
 const moment = require('moment');
+const PF = require('pathfinding');
 import {
     loadProgressHandler,
     createGroupedArray,
     scaleSpread,
     scaleConcat,
+    msgConsole,
     scaleApply
 } from './utils'
+
+// util function
+
+Number.prototype.roundTo = function(num) {
+    let resto = this%num;
+    if (resto <= (num/2)) {
+        return this-resto;
+    } else {
+        return this+num-resto;
+    }
+};
+
 // load pixi jsons
 const level = require('./pixi-jsons/es_floor_1.json');
 
 $(document).ready(()=>{
 
+    // ------------------------------------------------------------------  logging console
+
+    let log = new msgConsole({
+        id:'messages',
+        timeClass: 'mc-cursor-time',
+        animated: false,
+        animateCssClass: 'fadeIn',
+        showTime: true
+    });
+
+    setInterval(()=>{
+        $('.mc-cursor-time').html(moment().format('HH:mm:ss'));
+    },1000);
+
+
     // ------------------------------------------------------------------  viewport
 
     console.log(`Window Height:${window.innerHeight}, Width:${window.innerWidth}`);
-    let esmWidth = 0.8 * window.innerHeight;
-    let rs = esmWidth/50;
+    const esmWidth = 0.8 * window.innerHeight;
+    esmWidth.roundTo(10);
+    log.msg(`calculated esmWidth:${log.clr(esmWidth,'monopink')}`);
+    const rs = esmWidth/50;
+    log.msg(`calculated rs:${log.clr(rs,'monopink')}`);
 
     // ---------------------------------------------------------------- PIXI init
     //Aliases
-    let Application = PIXI.Application,
+    const Application = PIXI.Application,
         loader = PIXI.loader,
         resources = PIXI.loader.resources,
         Sprite = PIXI.Sprite,
@@ -33,7 +65,7 @@ $(document).ready(()=>{
         Graphics = PIXI.Graphics;
 
     //Create a Pixi Application
-    let app = new Application({
+    const app = new Application({
             width: esmWidth,
             height: esmWidth,
             antialias: true,
@@ -50,13 +82,9 @@ $(document).ready(()=>{
     let mainGrid = Array(50).fill().map(() => Array(50).fill(0)); // 50 x 50
     // let subGrid = Array(200).fill().map(() => Array(200).fill(0)); // 200 x 200
 
-    // STAGES
-    let wallsStage = new Container;
-    app.renderer.render(wallsStage);
-    console.log(app.renderer);
-
     let mainGridNum = {
         floor: 0,
+        exit: 4,
         wall: 8,
         sensor: 6,
     };
@@ -75,6 +103,51 @@ $(document).ready(()=>{
         }
     };
 
+
+    // STAGES
+    // create containers
+    let wallContainer, evacueeContainer, sensorContainer, exitContainer, pathContainer;
+
+    // Arrays to keep tracks of display objects
+    let evacueesArr = [],
+        sensorsArr = [],
+        exitArr = [];
+    let evacueesCount = 0,
+        sensorCount = 0,
+        exitCount = 0;
+
+    function initContainers () {
+        wallContainer = new Container();
+        evacueeContainer = new Container();
+        sensorContainer = new Container();
+        exitContainer = new Container();
+        pathContainer = new Container();
+
+        // Add containers to root stage
+        app.stage.addChild(wallContainer);
+        app.stage.addChild(evacueeContainer);
+        app.stage.addChild(sensorContainer);
+        app.stage.addChild(exitContainer);
+        app.stage.addChild(pathContainer);
+    }
+
+    function clearContainers () {
+        evacueesCount = 0;
+        sensorCount = 0;
+        exitCount = 0;
+        evacueesArr = [];
+        sensorsArr = [];
+        exitArr = [];
+        // Clear containers from root stage
+        app.stage.removeChild(wallContainer);
+        app.stage.removeChild(evacueeContainer);
+        app.stage.removeChild(sensorContainer);
+        app.stage.removeChild(exitContainer);
+        app.stage.removeChild(pathContainer);
+    }
+
+
+
     // ---------------------------------------------------------- View loading
 
     //Add the canvas that Pixi automatically created for you to the HTML document
@@ -89,22 +162,28 @@ $(document).ready(()=>{
 
     // ----------------------------------------------------------- Pixi SETUP FUNCTION
 
+    initContainers(); // Initialize containers
+
     function setup() {
 
         console.log('All files loaded');
+        log.msg(`all pixi resources loaded`);
 
         // Get 2D array of floor including walls and outer area
-        let preArr = createGroupedArray(level.layers[0].data,50);
-        console.log('preArr', preArr);
+        let preArr = createGroupedArray(level.layers[0].data,50); log.msg(`preArr changed to 2D array`);
+        // console.log('preArr', preArr);
 
         // Set Up EasyStar for Path Finding
         // scale 50 x 50 array by 4 to 200 x 200 array
         let mainArr = scaleConcat(preArr, 16); // convert 50 x 50 to 200 x 200
-        console.log('mainArr',mainArr);
+        log.msg(`preArr scaled by 16 and set to mainArr`);
+        // console.log('mainArr',mainArr);
+
         // Easy star will do path finding on 200 x 200 array (subgrid)
         // because hazard tiles will belong to subgrid (they are 4 x 4 size)
-        easystar.setGrid(mainArr);
-        easystar.setAcceptableTiles([0]);
+        // easystar.setGrid(mainArr); log.msg(`pathfinding set up with mainArr`);
+        // easystar.setAcceptableTiles([0]); log.msg(`pathfinding walkable tiles: 0 `);
+
 
 
         // Draw 50 x 50 grid to canvas
@@ -117,15 +196,14 @@ $(document).ready(()=>{
             alpha: 0.3,
             width: 1
         });
+        log.msg(`grid drawn`);
+
 
 
         //Add one evacuee to the stage
         // TODO: Add multiple evacuees
         es_sprites = resources['images/es_sprites.json'].textures;
-        evacuee = new Sprite(es_sprites['person_16x16_red_000.png']);
-        evacuee.scale.x = rs/16;
-        evacuee.scale.y = rs/16;
-        app.stage.addChild(evacuee);
+
 
 
         // click events on grid
@@ -135,27 +213,34 @@ $(document).ready(()=>{
             switch(objectSel) {
                 case 'cursor':
                     console.log('objectSel',objectSel);
-                    console.log('rs',rs);
-                    console.log('pointer', pointer);
-                    console.log('Cursor xy',pointer.x - pointer.x%rs - .5, pointer.y - pointer.y%rs- .5);
-                    console.log(`mainGrid Normal [X,Y] => [${parseInt(pointer.x/rs)},${parseInt(pointer.y/rs)}]`);
+                    log.msg(`[X,Y] => [${parseInt(pointer.x/rs)},${parseInt(pointer.y/rs)}]`);
+                    // console.log('rs',rs);
+                    // console.log('pointer', pointer);
+                    // console.log('Cursor xy',pointer.x - pointer.x%rs - .5, pointer.y - pointer.y%rs- .5);
+                    // console.log(`mainGrid Normal [X,Y] => [${parseInt(pointer.x/rs)},${parseInt(pointer.y/rs)}]`);
                     // console.log(`mainGrid Walls [X,Y] => [${parseInt(pointer.x/rs)},${parseInt(pointer.y/rs)}]`);
                     break;
                 case 'remove':
                     console.log('objectSel',objectSel);
-                    console.log('remove xy',pointer.x - pointer.x%rs - .5, pointer.y - pointer.y%rs- .5);
+                    log.msg(`remove obj at [${pointer.x - pointer.x%rs - .5}, ${pointer.y - pointer.y%rs- .5}]`);
+
                     mainGrid[parseInt(pointer.y/rs)][parseInt(pointer.x/rs)] = mainGridNum.floor; // wall
                     break;
                 case 'evacuee':
                     console.log('objectSel',objectSel);
-                    evacuee.x = pointer.x - pointer.x%rs - .5;
-                    evacuee.y = pointer.y - pointer.y%rs- .5;
-                    evacuee.scale.x = rs/16;
-                    evacuee.scale.y = rs/16;
+                    evacueesArr[evacueesCount] = new Sprite(es_sprites['person_16x16_red_000.png']);
+                    evacueesArr[evacueesCount].scale.x = rs/16;
+                    evacueesArr[evacueesCount].scale.y = rs/16;
+                    evacueesArr[evacueesCount].x = pointer.x - pointer.x%rs - .5;
+                    evacueesArr[evacueesCount].y = pointer.y - pointer.y%rs- .5;
+                    evacueeContainer.addChild(evacueesArr[evacueesCount]);
+                    log.msg(`Evacuee ${evacueesCount} added at [${evacueesArr[evacueesCount].x}, ${evacueesArr[evacueesCount].y}] `);
+                    evacueesCount++;
                     break;
                 case 'wall':
                     console.log('objectSel',objectSel);
                     drawTile({
+                        resetStage: false,
                         len: rs,
                         pointerY:pointer.y,
                         pointerX:pointer.x,
@@ -174,15 +259,15 @@ $(document).ready(()=>{
                     break;
                 case 'walls':
                     console.log('objectSel',objectSel);
-                    console.log(wallsObj);
+                    // console.log(wallsObj);
                     if (!wallsObj.start.done) {
                         wallsObj.start.x = pointer.x;
                         wallsObj.start.y = pointer.y;
                         wallsObj.start.done = true;
                         wallsObj.end.done = false;
                     } else if (wallsObj.start.done && !wallsObj.end.done) {
-                        console.log('pointer', pointer);
-                        console.log('wallsObj', wallsObj);
+                        // console.log('pointer', pointer);
+                        // console.log('wallsObj', wallsObj);
                         wallsObj.start.done = !wallsObj.start.done;
                         wallsObj.end.x = pointer.x;
                         wallsObj.end.y = pointer.y;
@@ -194,25 +279,46 @@ $(document).ready(()=>{
                     }
                     break;
                 case 'sensor':
-                    console.log('objectSel',objectSel);
-                    let sensor = new AnimatedSprite(animFrameSetter('hazard_sensor_16x16_on', 2)); // on state
-                    sensor.interactive = true;
-                    sensor.animationSpeed = 0.3;
-                    sensor.play();
-                    sensor.on('mousedown',() => {
+                    console.log('objectSel', objectSel);
+                    sensorsArr[sensorCount] = new AnimatedSprite(animFrameSetter('hazard_sensor_16x16_on', 2)); // on state
+                    sensorsArr[sensorCount].interactive = true;
+                    sensorsArr[sensorCount].animationSpeed = 0.3;
+                    sensorsArr[sensorCount].play();
+                    sensorsArr[sensorCount].on('mousedown',() => {
                         setTimeout(function () {
                             console.log('Sensor Removed!');
-                            app.stage.removeChild(sensor);
+                            sensorContainer.removeChild(sensorsArr[sensorCount] );
                         }, 1);
                     });
-                    app.stage.addChild(sensor);
-                    sensor.x = pointer.x - pointer.x%rs - .5;
-                    sensor.y = pointer.y - pointer.y%rs- .5;
-                    sensor.scale.x = rs/16;
-                    sensor.scale.y = rs/16;
+                    sensorContainer.addChild(sensorsArr[sensorCount] );
+                    sensorsArr[sensorCount] .x = pointer.x - pointer.x%rs - .5;
+                    sensorsArr[sensorCount] .y = pointer.y - pointer.y%rs- .5;
+                    sensorsArr[sensorCount] .scale.x = rs/16;
+                    sensorsArr[sensorCount] .scale.y = rs/16;
+                    sensorCount++;
                     mainGrid[parseInt(pointer.y/rs)][parseInt(pointer.x/rs)] = mainGridNum.sensor; // sensor
+                    log.msg(`Added sensor. sensor count: ${sensorCount}`);
                     break;
-
+                case 'exit':
+                    drawExit({
+                        resetStage: false,
+                        len: rs,
+                        pointerY:pointer.y,
+                        pointerX:pointer.x,
+                        x: pointer.x - pointer.x%rs - .5,
+                        y: pointer.y - pointer.y%rs- .5,
+                        line:{
+                            width:1,
+                            color:0x00FF00,
+                            alpha:0.5
+                        },
+                        fill:{
+                            color:0x00FF00,
+                            alpha:0.5
+                        }
+                    });
+                    console.log('exit selected!');
+                    break;
                 case 'fire':
                     console.log('Fire selected!');
                     break;
@@ -233,6 +339,13 @@ $(document).ready(()=>{
             // });
         };
 
+        $('.sim-control').on('submit', (e) => {
+            e.preventDefault();
+
+            log.msg(`running simulation ... `);
+            evacuate(4);
+        });
+
         //Start the game loop by adding the `gameLoop` function to
         //Pixi's `ticker` and providing it with a `delta` argument.
         app.ticker.add(delta => gameLoop(delta));
@@ -252,18 +365,23 @@ $(document).ready(()=>{
     // -------------------------------------------------------------  EVENTS (general)
 
     //------------------------------------------ Menu Events
+
+    // Run simulation
+
+
+
     // Load & save
     $('.esm-btn').on('click', (e) => {
         // event.preventDefault();
         console.log(e.target.id);
         switch (e.target.id) {
             case 'save-btn':
-                console.log("save-btn clicked!");
+                // console.log("save-btn clicked!");
                 $('#save-modal').iziModal('open');
 
                 break;
             case 'load-btn':
-                console.log("load-btn clicked!");
+                // console.log("load-btn clicked!");
                 $('#load-modal').iziModal('open');
 
                 break;
@@ -276,48 +394,53 @@ $(document).ready(()=>{
     $('.esm-radio-option').click(function(e) {
         $('.esm-radio-option').removeClass("focus-esm");
         let val = $(this).children()[0].value;
-        console.log('val', val);
+        // console.log('val', val);
         switch (val) {
             case 'cursor':
                 $(this).addClass("focus-esm");
                 objectSel = 'cursor';
-                console.log('pointer selected!');
+                // console.log('pointer selected!');
                 break;
             case 'remove':
                 $(this).addClass("focus-esm");
                 objectSel = 'remove';
-                console.log('remove selected!');
+                // console.log('remove selected!');
                 break;
             case 'evacuee':
                 $(this).addClass("focus-esm");
                 objectSel = 'evacuee';
-                console.log('evacuee selected!');
+                // console.log('evacuee selected!');
                 break;
             case 'wall':
                 $(this).addClass("focus-esm");
                 objectSel = 'wall';
-                console.log('wall selected!');
+                // console.log('wall selected!');
                 break;
             case 'walls':
                 $(this).addClass("focus-esm");
                 objectSel = 'walls';
-                console.log('walls selected!');
+                // console.log('walls selected!');
                 break;
             case 'sensor':
                 $(this).addClass("focus-esm");
                 objectSel = 'sensor';
-                console.log('sensor selected!');
+                // console.log('sensor selected!');
                 break;
             case 'fire':
                 $(this).addClass("focus-esm");
                 objectSel = 'fire';
-                console.log('fire selected!');
+                // console.log('fire selected!');
+                break;
+            case 'exit':
+                $(this).addClass("focus-esm");
+                objectSel = 'exit';
+                // console.log('exit selected!');
                 break;
             case 'info':
                 $(this).addClass("focus-esm");
                 objectSel = 'info';
-                console.log('info selected!');
-                console.log('mainGrid', mainGrid);
+                // console.log('info selected!');
+                // console.log('mainGrid', mainGrid);
                 $("#info-modal").iziModal('open');
                 break;
             default:
@@ -375,6 +498,7 @@ $(document).ready(()=>{
         if (size >=0 ) {
             for (let i = 0; i < Math.abs(len); i+=size) {
                 drawTile({
+                    resetStage: false,
                     len: rs,
                     pointerY: obj.start.y - obj.start.y%rs + i * my,
                     pointerX: obj.start.x - obj.start.x%rs + i * mx,
@@ -394,6 +518,7 @@ $(document).ready(()=>{
         } else { // if going up or left
             for (let i = Math.abs(len); i > 0; i+=size) {
                 drawTile({
+                    resetStage: false,
                     len: rs,
                     pointerY: obj.start.y - obj.start.y%rs + i * my,
                     pointerX: obj.start.x - obj.start.x%rs + i * mx,
@@ -418,10 +543,11 @@ $(document).ready(()=>{
 
     function findPath (startX, startY, endX, endY) {
         return new Promise ((resolve, reject) =>{
+            console.log('path find init:',startX, startY, endX, endY);
             easystar.findPath(startX, startY, endX, endY, function( path ) {
                 if (path === null) {
                     console.log("Path was not found.");
-                    reject(path);
+                    resolve([]);
                 } else {
                     console.log("Path was found. The first Point is " + path[0].x + " " + path[0].y);
                     resolve(path);
@@ -453,40 +579,64 @@ $(document).ready(()=>{
 
 
     function drawTile (options) {
-        let rectangle = new Graphics();
-        rectangle.lineStyle(options.line.width, options.line.color, options.line.alpha);
-        rectangle.beginFill(options.fill.color,options.fill.alpha);
-        rectangle.drawRect(options.x, options.y, options.len, options.len);
-        rectangle.endFill();
-        rectangle.interactive = true;
-        app.stage.addChild(rectangle);
+        let wallTile = new Graphics();
+        wallTile.lineStyle(options.line.width, options.line.color, options.line.alpha);
+        wallTile.beginFill(options.fill.color,options.fill.alpha);
+        wallTile.drawRect(options.x, options.y, options.len, options.len);
+        wallTile.endFill();
+        wallTile.interactive = true;
+        wallContainer.addChild(wallTile);
 
         // save new block to array
-        mainGrid[parseInt(options.pointerY/rs)][parseInt(options.pointerX/rs)] = mainGridNum.wall; // wall
+        if (!options.resetStage) {
+            mainGrid[parseInt(options.pointerY/rs)][parseInt(options.pointerX/rs)] = mainGridNum.wall; // wall
+        }
 
         // add mouse event
-        rectangle.on('mousedown',() => {
-            setTimeout(function () {
-                console.log('Tile removed!');
-                app.stage.removeChild(rectangle);
-            }, 1);
+        wallTile.on('mousedown',() => {
+            if (objectSel === 'remove') {
+                setTimeout(function () {
+                    console.log('Tile removed!');
+                    wallContainer.removeChild(wallTile);
+                }, 1);
+            }
         });
     }
 
+    function drawExit (options) {
+        let exitTile = new Graphics();
+        exitTile.lineStyle(options.line.width, options.line.color, options.line.alpha);
+        exitTile.beginFill(options.fill.color,options.fill.alpha);
+        exitTile.drawRect(options.x, options.y, options.len, options.len);
+        exitTile.endFill();
+        exitTile.interactive = true;
+        exitContainer.addChild(exitTile);
 
-    function drawPathTile (x,y,len) {
-        let pathRectangle = new Graphics();
-        pathRectangle.lineStyle(1, 0xFF0000, 1);
-        pathRectangle.beginFill(0xFF0000);
-        pathRectangle.drawRect(x, y, len, len);
-        pathRectangle.endFill();
-        app.stage.addChild(pathRectangle);
+        // save new block to array
+        if (!options.resetStage) {
+            mainGrid[parseInt(options.pointerY/rs)][parseInt(options.pointerX/rs)] = mainGridNum.exit; // exit
+        }
+        // add mouse event
+        exitTile.on('mousedown',() => {
+            if (objectSel === 'remove') {
+                setTimeout(function () {
+                    console.log('Exit removed!');
+                    exitContainer.removeChild(exitTile);
+                }, 1);
+            }
+        });
     }
 
-    function drawPath (arr, len) {
-        arr.forEach((el) => {
-            drawPathTile (el.x*4,el.y*4,len);
-        })
+    function drawPathLine (arr, width, color, alpha) {
+        let line = new Graphics();
+        line.lineStyle(width, color, alpha);
+        arr.forEach((el,i) => {
+            line.moveTo(el.x * rs/4, el.y * rs/4);
+            if(i !== arr.length - 1) {
+                line.lineTo(arr[i+1].x * rs/4, arr[i+1].y * rs/4);
+            }
+        });
+        pathContainer.addChild(line);
     }
 
     function animFrameSetter (frameTitle, num) {
@@ -494,7 +644,7 @@ $(document).ready(()=>{
         for (let i = 0; i < num; i++) {
             arr.push(PIXI.Texture.fromFrame(`${frameTitle}_00${i}.png`));
         }
-        console.log('frame arr', arr);
+        // console.log('frame arr', arr);
         return arr;
     }
 
@@ -508,7 +658,8 @@ $(document).ready(()=>{
             $(`#scene-arr-table`).append(row);
             el.forEach((el)=>{
                 let bgColor =
-                    el === 8 ? 'green' :
+                    el === 4 ? 'green' :
+                    el === 8 ? 'orange' :
                     el === 6 ? 'blue' :
                     'transparent';
                 $(row).append(`<td style="background: ${bgColor}">${el}</td>`)
@@ -516,6 +667,158 @@ $(document).ready(()=>{
 
         });
 
+    }
+
+    function newSensor (loc) {
+        sensorsArr[sensorCount] = new AnimatedSprite(animFrameSetter('hazard_sensor_16x16_on', 2)); // on state
+        sensorsArr[sensorCount].interactive = true;
+        sensorsArr[sensorCount].animationSpeed = 0.3;
+        sensorsArr[sensorCount].play();
+        sensorsArr[sensorCount].on('mousedown',() => {
+            if (objectSel === 'remove') {
+                setTimeout(function () {
+                    // console.log('Sensor Removed!');
+                    sensorContainer.removeChild(sensorsArr[sensorCount] );
+                }, 1);
+            }
+        });
+        sensorContainer.addChild(sensorsArr[sensorCount] );
+        sensorsArr[sensorCount] .x = loc.x * rs - .5;
+        sensorsArr[sensorCount] .y = loc.y * rs - .5;
+        sensorsArr[sensorCount] .scale.x = rs/16;
+        sensorsArr[sensorCount] .scale.y = rs/16;
+    }
+
+    function newExit (loc) {
+        drawExit({
+            resetStage: true,
+            len: rs,
+            pointerY:loc.y,
+            pointerX:loc.x,
+            x: loc.x * rs - .5,
+            y: loc.y * rs- .5,
+            line:{
+                width:1,
+                color:0x00FF00,
+                alpha:0.5
+            },
+            fill:{
+                color:0x00FF00,
+                alpha:0.5
+            }
+        });
+    }
+
+    function newWalls (loc) {
+        drawTile({
+            resetStage: true,
+            len: rs,
+            pointerY:loc.y,
+            pointerX:loc.x,
+            x: loc.x * rs - .5,
+            y: loc.y  * rs- .5,
+            line:{
+                width:1,
+                color:0xC2C2C2,
+                alpha:1
+            },
+            fill:{
+                color:0xFFFFFF,
+                alpha:1
+            }
+        });
+    }
+
+    function loadNewStage (obj) {
+        // console.log('loadNewStage', obj);
+        clearContainers (); log.msg(`scenario cleared`);
+        initContainers(); log.msg(`new scenario initialised`);
+
+        let newArr = JSON.parse(obj.sceneArr);
+        mainGrid = newArr.data;
+
+        mainGrid.forEach((el, j)=>{
+            el.forEach((el, i)=>{
+               if(el === mainGridNum.sensor ) {
+                   newSensor({x:i, y: j});
+               }
+               if(el === mainGridNum.wall) {
+                   newWalls({x:i, y: j});
+               }
+                if(el === mainGridNum.exit) {
+                    newExit({x:i, y: j});
+                }
+            });
+        });
+    }
+
+    function evacuate (subGridScale) {
+        // scale mainGrid Arr
+        let pathArr = scaleConcat(mainGrid, subGridScale);
+        let destArr = [];
+
+        // find exit points
+        for(let y = 0; y < mainGrid.length; y++) {
+            for(let x = 0; x < mainGrid[y].length; x++) {
+                if (mainGrid[y][x] === mainGridNum.exit){
+                    destArr.push({x:x,y:y});
+                    log.msg(`exit at x:${log.clr(x,'monoorange')},y:${log.clr(y,'monoorange')} sourced`);
+                }
+            }
+        }
+
+        // get top left corner location in destArr
+        destArr.forEach((loc)=>{
+            loc.x *= subGridScale;
+            loc.y *= subGridScale;
+            log.msg(`scaled exit at x:${log.clr(loc.x,'monoorange')},y:${log.clr(loc.y,'monoorange')}`);
+        });
+
+        // // console.log('evacuate fn pathArr', pathArr);
+        easystar.setGrid(JSON.parse(JSON.stringify(pathArr))); log.msg(`pathfinding set up with pathArr`);
+        easystar.setAcceptableTiles([0,4]); log.msg(`pathfinding walkable tiles: 0 `);
+
+        // // get evacuees position
+        evacueesArr.forEach((evacuee, i)=>{
+            // console.log(`evacuate fn: evacuee x:${parseInt(evacuee.x/rs)*subGridScale},y:${parseInt(evacuee.y/rs)*subGridScale}`);
+            findEvacPath(i, parseInt(evacuee.x/rs) * subGridScale, parseInt(evacuee.y/rs) * subGridScale, destArr);
+        });
+
+    }
+
+    function findEvacPath (i, x, y, destArr) {
+        // let promiseArr = [];
+        Promise.all(
+            destArr.map(o => findPath(x, y, o.x, o.y))
+        ).then(values => {
+            console.log(`All Paths for Evacuee ${i + 1}:`);
+            console.log(values);
+            // sort values ascending order
+            values.sort(function (a, b) {
+                return b.length - a.length;
+            }).reverse();
+            // draw paths
+            values.forEach((path, i) => {
+                if (i === 0) {
+                    drawPathLine(path,2,0x00FF00,1);
+                } else {
+                    drawPathLine(path,4,0x2196F3,0.3);
+                }
+            })
+        });
+
+        // destArr.forEach((exit)=>{
+        //     findPath(x,y,exit.x,exit.y).then((path) => {
+        //         console.log(`Evacuee ${i+1} path:`);
+        //         if (path.length > 0) {
+        //             drawPath(path, 2);
+        //         }
+        //         console.log(path);
+        //     }).catch((err) => {
+        //         console.log(`Evacuee ${i+1} Err:`);
+        //         console.log(err);
+        //     });
+        // });
     }
 
 
@@ -531,14 +834,15 @@ $(document).ready(()=>{
                 e.preventDefault();
                 if ($('#inlineFormInputText').val() !== "") {
                     let value = $('#inlineFormInputText').val();
-                    console.log(value);
+                    // console.log(value);
                     $.ajax({
                         url: "/save-scene",
                         type: "POST",
-                        data: {filename : value, sceneArr: JSON.stringify(mainGrid)},
+                        data: {filename : value, sceneArr:JSON.stringify({data:mainGrid})},
                         dataType: "json",
                         success: (res)=>{
-                            console.log(res);
+                            // console.log(res);
+                            $("#save-modal").iziModal('close');
                         },
                         error: (err) => {
                             console.log(err);
@@ -567,6 +871,7 @@ $(document).ready(()=>{
         borderBottom: false,
         width:800,
         onOpened: () => {
+            $('#filename-disp').empty();
             $.ajax({
                 url: "/load-scene",
                 type: "POST",
@@ -575,19 +880,66 @@ $(document).ready(()=>{
                 success: (dataArr)=>{
                     // console.log('dataArr',dataArr);
                     if (dataArr.length > 0) {
-                        console.log(moment(dataArr[0].createdAt).isValid());
-                        $('#example').DataTable( {
-                            data: dataArr,
-                            columns: [
+                        let table = $('#load-data-table').DataTable({
+                            "paging": false,
+                            "ordering": false,
+                            "info": false,
+                            "searching":false,
+                            "bDestroy": true,
+                            "data": dataArr,
+                            "columns": [
                                 { "data": "id" },
                                 { "data": "filename" },
                                 { "data": "createdAt" }
                             ]
-                        } );
-                        // dataArr.forEach((el) => {
-                        //     let sceneArr = JSON.parse(el.sceneArr);
-                        //     console.log(sceneArr);
-                        // });
+                        });
+
+                        let idToFind;
+
+                        $('#load-data-table tbody tr').on('click', (e) => {
+                            $('#filename-disp').empty();
+                            idToFind = e.currentTarget.children[0].innerText * 1;
+                            let filename = e.currentTarget.children[1].innerText;
+                            $('#filename-disp').text(filename);
+                        });
+
+                        $('#load-scene-btn').on('click',() => {
+                            if ($('#filename-disp').text() !== '') {
+                                dataArr.forEach((el)=>{
+                                   if(el.id === idToFind) {
+                                       loadNewStage(el);
+                                   }
+                                });
+                                $("#load-modal").iziModal('close');
+                            } else {
+                                $('#err-hint').css('visibility','visible');
+                                setTimeout(()=>{
+                                    $('#err-hint').css('visibility','hidden');
+                                },10000);
+                            }
+                        });
+
+                        $('#del-scene-btn').on('click',() => {
+                            if ($('#filename-disp').text() !== '') {
+                                $.ajax({
+                                    url: "/del-scene",
+                                    type: "POST",
+                                    data: {id: idToFind ,action: 'delete'},
+                                    dataType: "json",
+                                    success: (dataArr2)=>{
+                                        // console.log('del msg', dataArr2);
+                                        $('#filename-disp').empty();
+                                        $("#load-data-table").DataTable().ajax.reload();
+                                    }
+                                });
+                                // $("#load-modal").iziModal('close');
+                            } else {
+                                $('#err-hint').css('visibility','visible');
+                                setTimeout(()=>{
+                                    $('#err-hint').css('visibility','hidden');
+                                },10000);
+                            }
+                        })
                     } else {
                         console.log('no data to load!');
                     }

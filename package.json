@@ -17,6 +17,7 @@
     "morgan": "~1.9.0",
     "node-sass-middleware": "0.9.8",
     "nodemon": "^1.17.2",
+    "pathfinding": "^0.4.18",
     "printarray": "^0.1.4",
     "sequelize": "^4.37.5",
     "serve-favicon": "~2.4.5",

@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const db = require("../data/db.js");
+const sequelize = require('sequelize');
 
 router.post('/', function(req, res, next) {
     if (req.body.action === 'files') {

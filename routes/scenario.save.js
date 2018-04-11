@@ -7,11 +7,13 @@ const _ = require('underscore');
 router.post('/', function(req, res, next) {
     // console.log(req.body);
     let newObj = _.pick(req.body,'filename', 'sceneArr');
+    let sceneArr = JSON.stringify(JSON.parse(newObj.sceneArr));
     let dataObj = {
-        ...newObj,
+        filename: newObj.filename,
+        sceneArr: sceneArr
     };
     // res.status(200).json(dataObj);
-    db.scenarioModel.create(req.body).then((instance) => {
+    db.scenarioModel.create(dataObj).then((instance) => {
         res.status(200).json(instance);
     }, (err) => {
         res.status(500).json(err);
