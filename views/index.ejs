@@ -26,12 +26,13 @@
 
     <!-- Custom styles for this template -->
     <link href="/css/animate.css" rel="stylesheet">
-    <link href="/css/simple-scrollbar.css" rel="stylesheet">
+
     <link href="/css/creative.css" rel="stylesheet">
     <link href="/css/inputs.css" rel="stylesheet">
     <link href="/css/nav-tabs.css" rel="stylesheet">
     <link href="/css/messagelog.css" rel="stylesheet">
     <link href="/css/style.css" rel="stylesheet">
+    <link href="/css/simple-scrollbar.css" rel="stylesheet">
 
     <!-- Bootstrap core JavaScript -->
     <script src="/vendor/jquery/jquery.min.js"></script>
@@ -43,12 +44,12 @@
     <!--<script src="/vendor/magnific-popup/jquery.magnific-popup.min.js"></script>-->
     <script src="/vendor/iziModal/1.5.1/js/iziModal.min.js"></script>
     <script src="/js/moment.min.js"></script>
-    <script src="/js/simple-scrollbar.min.js"></script>
 
     <!-- Custom scripts for this template -->
     <script src="/js/creative.min.js"></script>
     <script src="/js/pixi.min.js"></script>
     <script src="/js/tink.js"></script>
+    <script src="/js/bump.js"></script>
     <script src="/js/datatables.min.js"></script>
 
 </head>
@@ -96,15 +97,23 @@
                                 <option>ASCT algo</option>
                             </select>
                         </div>
-                        <button type="submit" class="btn btn-primary sub-sim">RUN SIMULATION</button>
+                        <div style="display:flex;flex-direction:row;justify-content:space-evenly;">
+                            <button type="submit" class="btn btn-primary sub-sim">RUN SIMULATION</button>
+                            <button id="reset-sim" type="button" class="btn btn-primary but-sim">reset</button>
+                        </div>
+
                     </form>
-                    <div class="esm-accordion-header">EVENT LOG</div>
-                    <div id="messages">
-                        <div class="mc-row mc-cursor "><span class="mc-time"><span class="mc-cursor-time"></span> &lambda;</span><input class="mc-input"/></div>
+                    <div class="esm-accordion-header">CONSOLE</div>
+                    <div id="messages" class="scroll4">
+                        <div class="mc-row mc-cursor "><span class="mc-time"><span class="mc-cursor-time"></span> &lambda;</span><input id="mc-input" class="mc-input"/></div>
                     </div>
                 </div>
-                <div id="app-render" class="esm-render">
+                <div class="canvas-container">
+                    <div id="info-feed"></div>
+                    <div id="app-render" class="esm-render">
+                    </div>
                 </div>
+
                 <div class="card esm-card" style="width:100%;">
                     <div id="esm-accordion">
                         <div class="card">

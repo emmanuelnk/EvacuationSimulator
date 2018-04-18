@@ -77,7 +77,6 @@ export class msgConsole {
     msg (message) {
         let animated = this.animated ? 'animated' : '';
         let disp = this.showTime ? '' : 'display:none';
-        console.log('this.div', this.div);
         let messages = document.getElementById(this.div);
         let isScrolledToBottom = messages.scrollHeight - messages.clientHeight <= messages.scrollTop + 1;
         let time = moment().format('HH:mm:ss');
@@ -88,6 +87,32 @@ export class msgConsole {
         if(isScrolledToBottom){
             messages.scrollTop = messages.scrollHeight - messages.clientHeight;
         }
+    }
+
+    clr (str, color) {
+        let spClr =
+            color === 'err' ? 'red' :
+                color === 'success' ? 'darkgreen' :
+                    color === 'warn' ? 'yellow' :
+                        color === 'monoorange' ? '#FD971F' :
+                            color === 'monoblue' ? '#66D9EF' :
+                                color === 'monopink' ? '#F92672' :
+                                    color === 'monogreen' ? '#A6E22E' :
+                                        color;
+        return `<span style="color:${spClr}">${str}</span>`;
+    }
+}
+
+export class msgTicker {
+    constructor (obj) {
+        this.div = obj.id;
+        this.animated = obj.animated;
+        this.animateCssClass = obj.animateCssClass;
+    }
+
+    msg (message) {
+        let animated = this.animated ? 'animated' : '';
+        $(`#${this.div}`).empty().html(`<p class="${animated} ${this.animateCssClass}">> ${message}</p>`);
     }
 
     clr (str, color) {

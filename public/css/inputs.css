@@ -42,6 +42,10 @@
     color: white;
 }
 
+.esm-radio-option:hover,.esm-btn:hover {
+    background: crimson;
+}
+
 .esm-btn {
     background: transparent;
     color: white;
@@ -234,11 +238,16 @@ div#disp-scene-arr td, div#disp-scene-arr tr {
     background:#F05F40;
     color:black;
 }
-.sub-sim {
+.sub-sim, .but-sim {
     border-radius: 0;
 }
-.sub-sim:hover {
+.sub-sim:hover,.but-sim:hover  {
     background:crimson!important;
+    border: solid white 2px;
+}
+.but-sim {
+    background:black;
+    border: solid white 2px;
 }
 
 #sim-select-1 {
