@@ -51,6 +51,7 @@
     <script src="/js/tink.js"></script>
     <script src="/js/bump.js"></script>
     <script src="/js/datatables.min.js"></script>
+    <script src="/js/fabric.min.js"></script>
 
 </head>
 
@@ -98,8 +99,9 @@
                             </select>
                         </div>
                         <div style="display:flex;flex-direction:row;justify-content:space-evenly;">
-                            <button type="submit" class="btn btn-primary sub-sim">RUN SIMULATION</button>
-                            <button id="reset-sim" type="button" class="btn btn-primary but-sim">reset</button>
+                            <button type="submit" class="btn btn-primary sub-sim">RUN </button>
+                            <button id="pause-sim" type="button" class="btn btn-primary but-sim">PAUSE</button>
+                            <button id="reset-sim" type="button" class="btn btn-primary but-sim">RESET</button>
                         </div>
 
                     </form>
@@ -266,7 +268,14 @@
                 </div>
             </div>
             <div class="tab-pane fade" id="stats-tab-2" role="tabpanel">
-                <h2 class="stat-tab-h">popn stats</h2>
+                <h2 class="stat-tab-h">SEND stats</h2>
+                <!--<button id="run-send-btn">RUN SEND</button>-->
+                <div id="c-container">
+                    <div class="heatmap"></div>
+                    <div class="heatmap-canvas">
+                        <canvas id="canvas"></canvas>
+                    </div>
+                </div>
             </div>
             <div class="tab-pane fade" id="stats-tab-3" role="tabpanel">
                 <h2 class="stat-tab-h">network stats</h2>

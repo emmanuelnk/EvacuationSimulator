@@ -975,6 +975,731 @@ module.exports = function(parent, x, y, costSoFar, simpleDistanceToTarget) {
     }
 };
 },{}],6:[function(require,module,exports){
+/*
+ * heatmap.js v2.0.5 | JavaScript Heatmap Library
+ *
+ * Copyright 2008-2016 Patrick Wied <heatmapjs@patrick-wied.at> - All rights reserved.
+ * Dual licensed under MIT and Beerware license 
+ *
+ * :: 2016-09-05 01:16
+ */
+;(function (name, context, factory) {
+
+  // Supports UMD. AMD, CommonJS/Node.js and browser context
+  if (typeof module !== "undefined" && module.exports) {
+    module.exports = factory();
+  } else if (typeof define === "function" && define.amd) {
+    define(factory);
+  } else {
+    context[name] = factory();
+  }
+
+})("h337", this, function () {
+
+// Heatmap Config stores default values and will be merged with instance config
+var HeatmapConfig = {
+  defaultRadius: 40,
+  defaultRenderer: 'canvas2d',
+  defaultGradient: { 0.25: "rgb(0,0,255)", 0.55: "rgb(0,255,0)", 0.85: "yellow", 1.0: "rgb(255,0,0)"},
+  defaultMaxOpacity: 1,
+  defaultMinOpacity: 0,
+  defaultBlur: .85,
+  defaultXField: 'x',
+  defaultYField: 'y',
+  defaultValueField: 'value', 
+  plugins: {}
+};
+var Store = (function StoreClosure() {
+
+  var Store = function Store(config) {
+    this._coordinator = {};
+    this._data = [];
+    this._radi = [];
+    this._min = 10;
+    this._max = 1;
+    this._xField = config['xField'] || config.defaultXField;
+    this._yField = config['yField'] || config.defaultYField;
+    this._valueField = config['valueField'] || config.defaultValueField;
+
+    if (config["radius"]) {
+      this._cfgRadius = config["radius"];
+    }
+  };
+
+  var defaultRadius = HeatmapConfig.defaultRadius;
+
+  Store.prototype = {
+    // when forceRender = false -> called from setData, omits renderall event
+    _organiseData: function(dataPoint, forceRender) {
+        var x = dataPoint[this._xField];
+        var y = dataPoint[this._yField];
+        var radi = this._radi;
+        var store = this._data;
+        var max = this._max;
+        var min = this._min;
+        var value = dataPoint[this._valueField] || 1;
+        var radius = dataPoint.radius || this._cfgRadius || defaultRadius;
+
+        if (!store[x]) {
+          store[x] = [];
+          radi[x] = [];
+        }
+
+        if (!store[x][y]) {
+          store[x][y] = value;
+          radi[x][y] = radius;
+        } else {
+          store[x][y] += value;
+        }
+        var storedVal = store[x][y];
+
+        if (storedVal > max) {
+          if (!forceRender) {
+            this._max = storedVal;
+          } else {
+            this.setDataMax(storedVal);
+          }
+          return false;
+        } else if (storedVal < min) {
+          if (!forceRender) {
+            this._min = storedVal;
+          } else {
+            this.setDataMin(storedVal);
+          }
+          return false;
+        } else {
+          return { 
+            x: x, 
+            y: y,
+            value: value, 
+            radius: radius,
+            min: min,
+            max: max 
+          };
+        }
+    },
+    _unOrganizeData: function() {
+      var unorganizedData = [];
+      var data = this._data;
+      var radi = this._radi;
+
+      for (var x in data) {
+        for (var y in data[x]) {
+
+          unorganizedData.push({
+            x: x,
+            y: y,
+            radius: radi[x][y],
+            value: data[x][y]
+          });
+
+        }
+      }
+      return {
+        min: this._min,
+        max: this._max,
+        data: unorganizedData
+      };
+    },
+    _onExtremaChange: function() {
+      this._coordinator.emit('extremachange', {
+        min: this._min,
+        max: this._max
+      });
+    },
+    addData: function() {
+      if (arguments[0].length > 0) {
+        var dataArr = arguments[0];
+        var dataLen = dataArr.length;
+        while (dataLen--) {
+          this.addData.call(this, dataArr[dataLen]);
+        }
+      } else {
+        // add to store  
+        var organisedEntry = this._organiseData(arguments[0], true);
+        if (organisedEntry) {
+          // if it's the first datapoint initialize the extremas with it
+          if (this._data.length === 0) {
+            this._min = this._max = organisedEntry.value;
+          }
+          this._coordinator.emit('renderpartial', {
+            min: this._min,
+            max: this._max,
+            data: [organisedEntry]
+          });
+        }
+      }
+      return this;
+    },
+    setData: function(data) {
+      var dataPoints = data.data;
+      var pointsLen = dataPoints.length;
+
+
+      // reset data arrays
+      this._data = [];
+      this._radi = [];
+
+      for(var i = 0; i < pointsLen; i++) {
+        this._organiseData(dataPoints[i], false);
+      }
+      this._max = data.max;
+      this._min = data.min || 0;
+      
+      this._onExtremaChange();
+      this._coordinator.emit('renderall', this._getInternalData());
+      return this;
+    },
+    removeData: function() {
+      // TODO: implement
+    },
+    setDataMax: function(max) {
+      this._max = max;
+      this._onExtremaChange();
+      this._coordinator.emit('renderall', this._getInternalData());
+      return this;
+    },
+    setDataMin: function(min) {
+      this._min = min;
+      this._onExtremaChange();
+      this._coordinator.emit('renderall', this._getInternalData());
+      return this;
+    },
+    setCoordinator: function(coordinator) {
+      this._coordinator = coordinator;
+    },
+    _getInternalData: function() {
+      return { 
+        max: this._max,
+        min: this._min, 
+        data: this._data,
+        radi: this._radi 
+      };
+    },
+    getData: function() {
+      return this._unOrganizeData();
+    }/*,
+
+      TODO: rethink.
+
+    getValueAt: function(point) {
+      var value;
+      var radius = 100;
+      var x = point.x;
+      var y = point.y;
+      var data = this._data;
+
+      if (data[x] && data[x][y]) {
+        return data[x][y];
+      } else {
+        var values = [];
+        // radial search for datapoints based on default radius
+        for(var distance = 1; distance < radius; distance++) {
+          var neighbors = distance * 2 +1;
+          var startX = x - distance;
+          var startY = y - distance;
+
+          for(var i = 0; i < neighbors; i++) {
+            for (var o = 0; o < neighbors; o++) {
+              if ((i == 0 || i == neighbors-1) || (o == 0 || o == neighbors-1)) {
+                if (data[startY+i] && data[startY+i][startX+o]) {
+                  values.push(data[startY+i][startX+o]);
+                }
+              } else {
+                continue;
+              } 
+            }
+          }
+        }
+        if (values.length > 0) {
+          return Math.max.apply(Math, values);
+        }
+      }
+      return false;
+    }*/
+  };
+
+
+  return Store;
+})();
+
+var Canvas2dRenderer = (function Canvas2dRendererClosure() {
+
+  var _getColorPalette = function(config) {
+    var gradientConfig = config.gradient || config.defaultGradient;
+    var paletteCanvas = document.createElement('canvas');
+    var paletteCtx = paletteCanvas.getContext('2d');
+
+    paletteCanvas.width = 256;
+    paletteCanvas.height = 1;
+
+    var gradient = paletteCtx.createLinearGradient(0, 0, 256, 1);
+    for (var key in gradientConfig) {
+      gradient.addColorStop(key, gradientConfig[key]);
+    }
+
+    paletteCtx.fillStyle = gradient;
+    paletteCtx.fillRect(0, 0, 256, 1);
+
+    return paletteCtx.getImageData(0, 0, 256, 1).data;
+  };
+
+  var _getPointTemplate = function(radius, blurFactor) {
+    var tplCanvas = document.createElement('canvas');
+    var tplCtx = tplCanvas.getContext('2d');
+    var x = radius;
+    var y = radius;
+    tplCanvas.width = tplCanvas.height = radius*2;
+
+    if (blurFactor == 1) {
+      tplCtx.beginPath();
+      tplCtx.arc(x, y, radius, 0, 2 * Math.PI, false);
+      tplCtx.fillStyle = 'rgba(0,0,0,1)';
+      tplCtx.fill();
+    } else {
+      var gradient = tplCtx.createRadialGradient(x, y, radius*blurFactor, x, y, radius);
+      gradient.addColorStop(0, 'rgba(0,0,0,1)');
+      gradient.addColorStop(1, 'rgba(0,0,0,0)');
+      tplCtx.fillStyle = gradient;
+      tplCtx.fillRect(0, 0, 2*radius, 2*radius);
+    }
+
+
+
+    return tplCanvas;
+  };
+
+  var _prepareData = function(data) {
+    var renderData = [];
+    var min = data.min;
+    var max = data.max;
+    var radi = data.radi;
+    var data = data.data;
+
+    var xValues = Object.keys(data);
+    var xValuesLen = xValues.length;
+
+    while(xValuesLen--) {
+      var xValue = xValues[xValuesLen];
+      var yValues = Object.keys(data[xValue]);
+      var yValuesLen = yValues.length;
+      while(yValuesLen--) {
+        var yValue = yValues[yValuesLen];
+        var value = data[xValue][yValue];
+        var radius = radi[xValue][yValue];
+        renderData.push({
+          x: xValue,
+          y: yValue,
+          value: value,
+          radius: radius
+        });
+      }
+    }
+
+    return {
+      min: min,
+      max: max,
+      data: renderData
+    };
+  };
+
+
+  function Canvas2dRenderer(config) {
+    var container = config.container;
+    var shadowCanvas = this.shadowCanvas = document.createElement('canvas');
+    var canvas = this.canvas = config.canvas || document.createElement('canvas');
+    var renderBoundaries = this._renderBoundaries = [10000, 10000, 0, 0];
+
+    var computed = getComputedStyle(config.container) || {};
+
+    canvas.className = 'heatmap-canvas';
+
+    this._width = canvas.width = shadowCanvas.width = config.width || +(computed.width.replace(/px/,''));
+    this._height = canvas.height = shadowCanvas.height = config.height || +(computed.height.replace(/px/,''));
+
+    this.shadowCtx = shadowCanvas.getContext('2d');
+    this.ctx = canvas.getContext('2d');
+
+    // @TODO:
+    // conditional wrapper
+
+    canvas.style.cssText = shadowCanvas.style.cssText = 'position:absolute;left:0;top:0;';
+
+    container.style.position = 'relative';
+    container.appendChild(canvas);
+
+    this._palette = _getColorPalette(config);
+    this._templates = {};
+
+    this._setStyles(config);
+  };
+
+  Canvas2dRenderer.prototype = {
+    renderPartial: function(data) {
+      if (data.data.length > 0) {
+        this._drawAlpha(data);
+        this._colorize();
+      }
+    },
+    renderAll: function(data) {
+      // reset render boundaries
+      this._clear();
+      if (data.data.length > 0) {
+        this._drawAlpha(_prepareData(data));
+        this._colorize();
+      }
+    },
+    _updateGradient: function(config) {
+      this._palette = _getColorPalette(config);
+    },
+    updateConfig: function(config) {
+      if (config['gradient']) {
+        this._updateGradient(config);
+      }
+      this._setStyles(config);
+    },
+    setDimensions: function(width, height) {
+      this._width = width;
+      this._height = height;
+      this.canvas.width = this.shadowCanvas.width = width;
+      this.canvas.height = this.shadowCanvas.height = height;
+    },
+    _clear: function() {
+      this.shadowCtx.clearRect(0, 0, this._width, this._height);
+      this.ctx.clearRect(0, 0, this._width, this._height);
+    },
+    _setStyles: function(config) {
+      this._blur = (config.blur == 0)?0:(config.blur || config.defaultBlur);
+
+      if (config.backgroundColor) {
+        this.canvas.style.backgroundColor = config.backgroundColor;
+      }
+
+      this._width = this.canvas.width = this.shadowCanvas.width = config.width || this._width;
+      this._height = this.canvas.height = this.shadowCanvas.height = config.height || this._height;
+
+
+      this._opacity = (config.opacity || 0) * 255;
+      this._maxOpacity = (config.maxOpacity || config.defaultMaxOpacity) * 255;
+      this._minOpacity = (config.minOpacity || config.defaultMinOpacity) * 255;
+      this._useGradientOpacity = !!config.useGradientOpacity;
+    },
+    _drawAlpha: function(data) {
+      var min = this._min = data.min;
+      var max = this._max = data.max;
+      var data = data.data || [];
+      var dataLen = data.length;
+      // on a point basis?
+      var blur = 1 - this._blur;
+
+      while(dataLen--) {
+
+        var point = data[dataLen];
+
+        var x = point.x;
+        var y = point.y;
+        var radius = point.radius;
+        // if value is bigger than max
+        // use max as value
+        var value = Math.min(point.value, max);
+        var rectX = x - radius;
+        var rectY = y - radius;
+        var shadowCtx = this.shadowCtx;
+
+
+
+
+        var tpl;
+        if (!this._templates[radius]) {
+          this._templates[radius] = tpl = _getPointTemplate(radius, blur);
+        } else {
+          tpl = this._templates[radius];
+        }
+        // value from minimum / value range
+        // => [0, 1]
+        var templateAlpha = (value-min)/(max-min);
+        // this fixes #176: small values are not visible because globalAlpha < .01 cannot be read from imageData
+        shadowCtx.globalAlpha = templateAlpha < .01 ? .01 : templateAlpha;
+
+        shadowCtx.drawImage(tpl, rectX, rectY);
+
+        // update renderBoundaries
+        if (rectX < this._renderBoundaries[0]) {
+            this._renderBoundaries[0] = rectX;
+          }
+          if (rectY < this._renderBoundaries[1]) {
+            this._renderBoundaries[1] = rectY;
+          }
+          if (rectX + 2*radius > this._renderBoundaries[2]) {
+            this._renderBoundaries[2] = rectX + 2*radius;
+          }
+          if (rectY + 2*radius > this._renderBoundaries[3]) {
+            this._renderBoundaries[3] = rectY + 2*radius;
+          }
+
+      }
+    },
+    _colorize: function() {
+      var x = this._renderBoundaries[0];
+      var y = this._renderBoundaries[1];
+      var width = this._renderBoundaries[2] - x;
+      var height = this._renderBoundaries[3] - y;
+      var maxWidth = this._width;
+      var maxHeight = this._height;
+      var opacity = this._opacity;
+      var maxOpacity = this._maxOpacity;
+      var minOpacity = this._minOpacity;
+      var useGradientOpacity = this._useGradientOpacity;
+
+      if (x < 0) {
+        x = 0;
+      }
+      if (y < 0) {
+        y = 0;
+      }
+      if (x + width > maxWidth) {
+        width = maxWidth - x;
+      }
+      if (y + height > maxHeight) {
+        height = maxHeight - y;
+      }
+
+      var img = this.shadowCtx.getImageData(x, y, width, height);
+      var imgData = img.data;
+      var len = imgData.length;
+      var palette = this._palette;
+
+
+      for (var i = 3; i < len; i+= 4) {
+        var alpha = imgData[i];
+        var offset = alpha * 4;
+
+
+        if (!offset) {
+          continue;
+        }
+
+        var finalAlpha;
+        if (opacity > 0) {
+          finalAlpha = opacity;
+        } else {
+          if (alpha < maxOpacity) {
+            if (alpha < minOpacity) {
+              finalAlpha = minOpacity;
+            } else {
+              finalAlpha = alpha;
+            }
+          } else {
+            finalAlpha = maxOpacity;
+          }
+        }
+
+        imgData[i-3] = palette[offset];
+        imgData[i-2] = palette[offset + 1];
+        imgData[i-1] = palette[offset + 2];
+        imgData[i] = useGradientOpacity ? palette[offset + 3] : finalAlpha;
+
+      }
+
+      img.data = imgData;
+      this.ctx.putImageData(img, x, y);
+
+      this._renderBoundaries = [1000, 1000, 0, 0];
+
+    },
+    getValueAt: function(point) {
+      var value;
+      var shadowCtx = this.shadowCtx;
+      var img = shadowCtx.getImageData(point.x, point.y, 1, 1);
+      var data = img.data[3];
+      var max = this._max;
+      var min = this._min;
+
+      value = (Math.abs(max-min) * (data/255)) >> 0;
+
+      return value;
+    },
+    getDataURL: function() {
+      return this.canvas.toDataURL();
+    }
+  };
+
+
+  return Canvas2dRenderer;
+})();
+
+
+var Renderer = (function RendererClosure() {
+
+  var rendererFn = false;
+
+  if (HeatmapConfig['defaultRenderer'] === 'canvas2d') {
+    rendererFn = Canvas2dRenderer;
+  }
+
+  return rendererFn;
+})();
+
+
+var Util = {
+  merge: function() {
+    var merged = {};
+    var argsLen = arguments.length;
+    for (var i = 0; i < argsLen; i++) {
+      var obj = arguments[i]
+      for (var key in obj) {
+        merged[key] = obj[key];
+      }
+    }
+    return merged;
+  }
+};
+// Heatmap Constructor
+var Heatmap = (function HeatmapClosure() {
+
+  var Coordinator = (function CoordinatorClosure() {
+
+    function Coordinator() {
+      this.cStore = {};
+    };
+
+    Coordinator.prototype = {
+      on: function(evtName, callback, scope) {
+        var cStore = this.cStore;
+
+        if (!cStore[evtName]) {
+          cStore[evtName] = [];
+        }
+        cStore[evtName].push((function(data) {
+            return callback.call(scope, data);
+        }));
+      },
+      emit: function(evtName, data) {
+        var cStore = this.cStore;
+        if (cStore[evtName]) {
+          var len = cStore[evtName].length;
+          for (var i=0; i<len; i++) {
+            var callback = cStore[evtName][i];
+            callback(data);
+          }
+        }
+      }
+    };
+
+    return Coordinator;
+  })();
+
+
+  var _connect = function(scope) {
+    var renderer = scope._renderer;
+    var coordinator = scope._coordinator;
+    var store = scope._store;
+
+    coordinator.on('renderpartial', renderer.renderPartial, renderer);
+    coordinator.on('renderall', renderer.renderAll, renderer);
+    coordinator.on('extremachange', function(data) {
+      scope._config.onExtremaChange &&
+      scope._config.onExtremaChange({
+        min: data.min,
+        max: data.max,
+        gradient: scope._config['gradient'] || scope._config['defaultGradient']
+      });
+    });
+    store.setCoordinator(coordinator);
+  };
+
+
+  function Heatmap() {
+    var config = this._config = Util.merge(HeatmapConfig, arguments[0] || {});
+    this._coordinator = new Coordinator();
+    if (config['plugin']) {
+      var pluginToLoad = config['plugin'];
+      if (!HeatmapConfig.plugins[pluginToLoad]) {
+        throw new Error('Plugin \''+ pluginToLoad + '\' not found. Maybe it was not registered.');
+      } else {
+        var plugin = HeatmapConfig.plugins[pluginToLoad];
+        // set plugin renderer and store
+        this._renderer = new plugin.renderer(config);
+        this._store = new plugin.store(config);
+      }
+    } else {
+      this._renderer = new Renderer(config);
+      this._store = new Store(config);
+    }
+    _connect(this);
+  };
+
+  // @TODO:
+  // add API documentation
+  Heatmap.prototype = {
+    addData: function() {
+      this._store.addData.apply(this._store, arguments);
+      return this;
+    },
+    removeData: function() {
+      this._store.removeData && this._store.removeData.apply(this._store, arguments);
+      return this;
+    },
+    setData: function() {
+      this._store.setData.apply(this._store, arguments);
+      return this;
+    },
+    setDataMax: function() {
+      this._store.setDataMax.apply(this._store, arguments);
+      return this;
+    },
+    setDataMin: function() {
+      this._store.setDataMin.apply(this._store, arguments);
+      return this;
+    },
+    configure: function(config) {
+      this._config = Util.merge(this._config, config);
+      this._renderer.updateConfig(this._config);
+      this._coordinator.emit('renderall', this._store._getInternalData());
+      return this;
+    },
+    repaint: function() {
+      this._coordinator.emit('renderall', this._store._getInternalData());
+      return this;
+    },
+    getData: function() {
+      return this._store.getData();
+    },
+    getDataURL: function() {
+      return this._renderer.getDataURL();
+    },
+    getValueAt: function(point) {
+
+      if (this._store.getValueAt) {
+        return this._store.getValueAt(point);
+      } else  if (this._renderer.getValueAt) {
+        return this._renderer.getValueAt(point);
+      } else {
+        return null;
+      }
+    }
+  };
+
+  return Heatmap;
+
+})();
+
+
+// core
+var heatmapFactory = {
+  create: function(config) {
+    return new Heatmap(config);
+  },
+  register: function(pluginKey, plugin) {
+    HeatmapConfig.plugins[pluginKey] = plugin;
+  }
+};
+
+return heatmapFactory;
+
+
+});
+},{}],7:[function(require,module,exports){
 //! moment.js
 
 ;(function (global, factory) {
@@ -5482,7 +6207,7 @@ module.exports = function(parent, x, y, costSoFar, simpleDistanceToTarget) {
 
 })));
 
-},{}],7:[function(require,module,exports){
+},{}],8:[function(require,module,exports){
 /*
 RainbowVis-JS 
 Released under Eclipse Public License - v 1.0
@@ -5792,16 +6517,19 @@ if (typeof module !== 'undefined') {
   module.exports = Rainbow;
 }
 
-},{}],8:[function(require,module,exports){
+},{}],9:[function(require,module,exports){
 'use strict';
 
 var _utils = require('./utils');
+
+var _pixi = require('./pixi.extensions');
 
 // imports
 var easystarjs = require('easystarjs');
 var moment = require('moment');
 var Rainbow = require('rainbowvis.js');
 var rainbow = new Rainbow();
+var h337 = require('heatmap.js');
 
 // util function
 
@@ -5883,6 +6611,7 @@ $(document).ready(function () {
     }); // 50 x 50
     var subGrid = []; // 200 x 200
     var subGridCurr = [];
+    var pauseStatArr = [];
     var subGridScale = 4;
 
     var mainGridNum = { floor: 0, evacuee: 2, exit: 4, wall: 8, sensor: 6 };
@@ -5891,6 +6620,7 @@ $(document).ready(function () {
 
     // hazards globals
     var hazStart = []; // starting pos
+    var hazStartGridPt = {};
     var hazardInterval = void 0,
         detectionInterval = void 0,
         fireHazardContainer = void 0;
@@ -5899,7 +6629,6 @@ $(document).ready(function () {
         return [];
     });
     var fireColorArr = getSpectrum();
-    console.log('fireColorArr', fireColorArr);
 
     // STAGES
     // create containers
@@ -5907,13 +6636,19 @@ $(document).ready(function () {
         evacueeContainer = void 0,
         sensorContainer = void 0,
         exitContainer = void 0,
-        pathContainer = void 0;
+        pathContainer = void 0,
+        graphLinkContainer = void 0;
 
     // Arrays to keep tracks of display objects
     var evacueesArr = [],
         sensorsArr = [],
         sensorRangeArr = [],
         exitArr = [];
+    var evacueeStartingPosArr = [];
+    // array to keep track of simulation timers
+    var intervalsArr = [];
+    var intervalsArrCount = 0;
+    var SIMULATION_STATUS = 'INIT';
 
     var evacueesCount = 0,
         sensorCount = 0,
@@ -5926,6 +6661,7 @@ $(document).ready(function () {
         sensorContainer = new Container();
         exitContainer = new Container();
         pathContainer = new Container();
+        graphLinkContainer = new Container();
         fireHazardContainer = new ParticleContainer(1000000);
         fireHazardContainer.alpha = 0.5;
         fireHazardContainer.autoResize = true;
@@ -5935,6 +6671,7 @@ $(document).ready(function () {
         app.stage.addChild(evacueeContainer);
         app.stage.addChild(sensorContainer);
         app.stage.addChild(exitContainer);
+        app.stage.addChild(graphLinkContainer);
         app.stage.addChild(pathContainer);
         app.stage.addChild(fireHazardContainer);
     }
@@ -5950,6 +6687,7 @@ $(document).ready(function () {
             return Array(50).fill(0);
         });
         evacueesArr = [];
+        evacueeStartingPosArr = [];
         sensorsArr = [];
         sensorRangeArr = [];
         exitArr = [];
@@ -5962,6 +6700,7 @@ $(document).ready(function () {
         app.stage.removeChild(evacueeContainer);
         app.stage.removeChild(sensorContainer);
         app.stage.removeChild(exitContainer);
+        app.stage.removeChild(graphLinkContainer);
         app.stage.removeChild(pathContainer);
         app.stage.removeChild(fireHazardContainer);
     }
@@ -6025,6 +6764,7 @@ $(document).ready(function () {
                     evacueesArr[evacueesCount].x = pointer.x - pointer.x % rs + 0.5 * rs - .5;
                     evacueesArr[evacueesCount].y = pointer.y - pointer.y % rs + 0.5 * rs - .5;
                     evacueesArr[evacueesCount].anchor.set(0.5, 0.5);
+                    evacueeStartingPosArr.push({ x: evacueesArr[evacueesCount].x, y: evacueesArr[evacueesCount].y, evacueeNum: evacueesCount });
                     evacueeContainer.addChild(evacueesArr[evacueesCount]);
                     log.msg('Evacuee ' + evacueesCount + ' added at [' + parseInt(evacueesArr[evacueesCount].x / rs) + ', ' + parseInt(evacueesArr[evacueesCount].y / rs) + '] ');
                     evacueesCount++;
@@ -6085,7 +6825,9 @@ $(document).ready(function () {
                         x: pointer.x - pointer.x % rs - .5,
                         y: pointer.x - pointer.x % rs - .5
                     });
-                    mainGrid[parseInt(pointer.y / rs)][parseInt(pointer.x / rs)] = 10;
+                    hazStartGridPt.y = parseInt(pointer.y / rs);
+                    hazStartGridPt.x = parseInt(pointer.x / rs);
+                    mainGrid[hazStartGridPt.y][hazStartGridPt.x] = 10;
                     console.log('Fire started!');
                     break;
                 case 'info':
@@ -6122,8 +6864,6 @@ $(document).ready(function () {
 
     // --------------------------------------------------------------   FUNCTIONS
 
-    function updateGlobalPosArrs() {}
-
     // path
 
     function findPath(startX, startY, endX, endY) {
@@ -6157,16 +6897,28 @@ $(document).ready(function () {
 
     function startHazard() {
         subGrid = (0, _utils.scaleConcat)(mainGrid, subGridScale);
-        // loops
-        detectionInterval = setInterval(function () {
-            sensorHazardDetection();
-        }, 500);
-        hazardInterval = setInterval(function () {
+        runHazard(subGrid);
+    }
+
+    function runHazard(subGrid) {
+        SIMULATION_STATUS = 'RUNNING';
+        intervalsArr[intervalsArrCount++] = setInterval(function () {
+            pathContainer.removeChildren();
             subGridCurr = subGrid.map(function (arr) {
                 return arr.slice();
             });
             simulateFire();
-        }, 5000); // 10 secs fire spread speed
+            sensorHazardDetection();
+            evacuate();
+        }, 1000); // 10 secs fire spread speed
+
+        function rn(max, min) {
+            return Math.floor(Math.random() * (max - min + 1)) + min;
+        }
+
+        function timeRanger(max, min) {
+            return Math.ceil((Math.floor(Math.random() * (max - min + 1)) + min) / 10) * 10;
+        }
 
         function simulateFire() {
             for (var y = 0; y < subGrid.length; y++) {
@@ -6183,9 +6935,11 @@ $(document).ready(function () {
             var rowLimit = subGrid.length - 1;
             var columnLimit = subGrid[0].length - 1;
             var neighborArr = [];
+            var pmax = 4,
+                pmin = 1;
 
-            for (var y = Math.max(0, i - 1); y <= Math.min(i + 1, rowLimit); y++) {
-                for (var x = Math.max(0, j - 1); x <= Math.min(j + 1, columnLimit); x++) {
+            for (var y = Math.max(0, i - rn(pmax, pmin)); y <= Math.min(i + rn(pmax, pmin), rowLimit); y++) {
+                for (var x = Math.max(0, j - rn(pmax, pmin)); x <= Math.min(j + rn(pmax, pmin), columnLimit); x++) {
                     neighborArr.push({ y: y, x: x });
                 }
             }
@@ -6194,9 +6948,20 @@ $(document).ready(function () {
 
         function increaseIntensity(neighborArr) {
             neighborArr.forEach(function (cell) {
-                var val = subGrid[cell.y][cell.x];
-                subGrid[cell.y][cell.x] = val === 0 ? 10 : val >= 10 && val < 40 ? ++val : val;
-                drawFireSprite(cell.y, cell.x, subGrid[cell.y][cell.x]);
+                if (subGrid[cell.y][cell.x] === 0) {
+                    subGrid[cell.y][cell.x] = 10;
+                    var timeRange = timeRanger(10, 100);
+                    if (SIMULATION_STATUS === 'RUNNING') {
+                        intervalsArrCount++;
+                        intervalsArr[intervalsArrCount] = setInterval(function () {
+                            drawFireSprite(cell.y, cell.x, subGrid[cell.y][cell.x]);
+                            subGrid[cell.y][cell.x]++;
+                            if (subGrid[cell.y][cell.x] === 40) {
+                                clearInterval(intervalsArr[intervalsArrCount]);
+                            }
+                        }, timeRange);
+                    }
+                }
             });
         }
     }
@@ -6206,12 +6971,14 @@ $(document).ready(function () {
             fireHazardArr[y][x] = new Sprite(Texture.WHITE);
             fireHazardArr[y][x].tint = intensityColor(intensity);
             fireHazardArr[y][x].width = rs / subGridScale;
-            fireHazardArr[y][x].height = rs / subGridScale;
+            fireHazardArr[y][x].height = rs;
             fireHazardArr[y][x].y = y * rs / subGridScale;
             fireHazardArr[y][x].x = x * rs / subGridScale;
             fireHazardContainer.addChild(fireHazardArr[y][x]);
+            fireHazardArr[y][x].intensity = intensity;
         } else {
             fireHazardArr[y][x].tint = intensityColor(intensity);
+            fireHazardArr[y][x].intensity = intensity;
         }
     }
 
@@ -6223,7 +6990,7 @@ $(document).ready(function () {
         var num = 30;
         var colorArr = [];
         rainbow.setNumberRange(1, num);
-        rainbow.setSpectrum('yellow', 'red', 'black');
+        rainbow.setSpectrum('#dcdcdc', '#696969', 'black');
 
         for (var i = 0; i < num; i++) {
             var color = rainbow.colourAt(i);
@@ -6241,17 +7008,78 @@ $(document).ready(function () {
 
     function sensorHazardDetection() {
         // run a loop that checks if the sensorRange has detected any hazards
-        var hazardDetectedArr = [];
         sensorRangeArr.forEach(function (sensorRange, i) {
+            var hazardIntensityTotal = 0;
+            var hazardCount = 0;
             var hazardDetected = b.hit(sensorRange, fireHazardContainer.children, false, false, true, function (collision, hazardSprite) {
-                console.log('hazardSprite');
-                console.log(hazardSprite);
+                if (collision) {
+                    var detIntensity = function detIntensity(i, state) {
+                        switch (true) {
+                            case state < 10:
+                                sensorsArr[i].info.state = 'NORMAL';
+                                if (sensorsArr[i].info.state !== sensorsArr[i].info.prevState) {
+                                    sensorsArr[i].info.prevState = sensorsArr[i].info.state;
+                                    changeSensorState(i, 'clr');
+                                }
+                                break;
+                            case state <= 15:
+                                sensorsArr[i].info.state = 'WARN_LOW';
+                                if (sensorsArr[i].info.state !== sensorsArr[i].info.prevState) {
+                                    sensorsArr[i].info.prevState = sensorsArr[i].info.state;
+                                    changeSensorState(i, 'wl');
+                                }
+                                break;
+                            case state <= 20:
+                                sensorsArr[i].info.state = 'WARN_MID';
+                                if (sensorsArr[i].info.state !== sensorsArr[i].info.prevState) {
+                                    sensorsArr[i].info.prevState = sensorsArr[i].info.state;
+                                    changeSensorState(i, 'wm');
+                                }
+                                break;
+                            case state <= 25:
+                                sensorsArr[i].info.state = 'WARN_HIGH';
+                                if (sensorsArr[i].info.state !== sensorsArr[i].info.prevState) {
+                                    sensorsArr[i].info.prevState = sensorsArr[i].info.state;
+                                    changeSensorState(i, 'wh');
+                                }
+                                break;
+                            case state <= 30:
+                                sensorsArr[i].info.state = 'HAZ_LOW';
+                                if (sensorsArr[i].info.state !== sensorsArr[i].info.prevState) {
+                                    sensorsArr[i].info.prevState = sensorsArr[i].info.state;
+                                    changeSensorState(i, 'hl');
+                                }
+                                break;
+                            case state <= 35:
+                                sensorsArr[i].info.state = 'HAZ_MID';
+                                if (sensorsArr[i].info.state !== sensorsArr[i].info.prevState) {
+                                    sensorsArr[i].info.prevState = sensorsArr[i].info.state;
+                                    changeSensorState(i, 'hm');
+                                }
+                                break;
+                            case state <= 40:
+                                sensorsArr[i].info.state = 'HAZ_HIGH';
+                                if (sensorsArr[i].info.state !== sensorsArr[i].info.prevState) {
+                                    sensorsArr[i].info.prevState = sensorsArr[i].info.state;
+                                    changeSensorState(i, 'hh');
+                                }
+                                break;
+                            default:
+                                break;
+                        }
+                    };
+
+                    hazardCount++;
+                    hazardIntensityTotal += hazardSprite.intensity;
+                    var hazardIntensityAvg = hazardIntensityTotal / hazardCount;
+                    sensorsArr[i].info.hazardDetected = 'TRUE';
+                    detIntensity(i, hazardIntensityAvg);
+
+                    sensorsArr[i].info.hazardIntensity = hazardIntensityAvg;
+                    tkr.msg('hazardIntensityAvg | sensor ' + i + ': ' + hazardIntensityAvg);
+                }
             });
-            if (hazardDetected) {
-                hazardDetectedArr.push(i);
-            }
         });
-        tkr.msg('hazard detected by sensor: ' + hazardDetectedArr.toString());
     }
 
     function disableSensorNetwork() {
@@ -6281,26 +7109,32 @@ $(document).ready(function () {
                 break;
             case 'warnLow':
             case 'wl':
+                sensorsArr[sensorNum].info.state = 'WARN_LOW';
                 stateChange(sensorNum, 0xFFD700, 1);
                 break;
             case 'warnMid':
             case 'wm':
+                sensorsArr[sensorNum].info.state = 'WARN_MID';
                 stateChange(sensorNum, 0xFFA500, 1);
                 break;
             case 'warnHigh':
             case 'wh':
+                sensorsArr[sensorNum].info.state = 'WARN_HIGH';
                 stateChange(sensorNum, 0xFF8C00, 1);
                 break;
             case 'hazardLow':
             case 'hl':
+                sensorsArr[sensorNum].info.state = 'HAZ_LOW';
                 stateChange(sensorNum, 0xFF6347, 1);
                 break;
             case 'hazardMid':
             case 'hm':
+                sensorsArr[sensorNum].info.state = 'HAZ_MID';
                 stateChange(sensorNum, 0xFF4500, 1);
                 break;
             case 'hazardHigh':
             case 'hh':
+                sensorsArr[sensorNum].info.state = 'HAZ_HIGH';
                 stateChange(sensorNum, 0xFF0000, 1);
                 break;
             default:
@@ -6309,8 +7143,6 @@ $(document).ready(function () {
         }
 
         function stateChange(num, color, alpha) {
-            console.log('srstate change num:', num);
-            console.log('srstate change color: ' + color);
             sensorsArr[num].removeChildren();
             sensorRangeArr[num] = drawSensorRange(esmWidth / 4, color, alpha, num);
             sensorsArr[num].addChild(sensorRangeArr[num]);
@@ -6318,28 +7150,86 @@ $(document).ready(function () {
     }
 
     function newSensor(loc) {
-        sensorsArr[sensorCount] = new AnimatedSprite(animFrameSetter('hazard_sensor_16x16_on', 2)); // on state
-        sensorsArr[sensorCount].interactive = true;
-        sensorsArr[sensorCount].animationSpeed = 0.3;
-        sensorsArr[sensorCount].play();
+        var sensor = new _pixi.SensorSprite(animFrameSetter('hazard_sensor_16x16_on', 2)); // on state
+        var sensorName = 'sensorsArr[' + sensorCount + ']';
+        var count = sensorCount;
 
-        var temp = 'sensorsArr[' + sensorCount + ']';
-        sensorsArr[sensorCount].name = temp;
-        sensorsArr[sensorCount].on('mousedown', function () {
+        // sprite settings, position, scale, anchor
+        sensor.interactive = true;
+        sensor.animationSpeed = 0.3;
+        sensor.play();
+        sensor.x = loc.x + 0.5 * rs - .5;
+        sensor.y = loc.y + 0.5 * rs - .5;
+        sensor.scale.x = rs / 16;
+        sensor.scale.y = rs / 16;
+        sensor.anchor.set(0.5, 0.5);
+
+        // sensor settings
+        sensor.info = {
+            name: sensorName,
+            id: sensorCount,
+            prevState: 'INITIAL',
+            state: 'NORMAL',
+            isServer: 'FALSE',
+            hazardDetected: 'FALSE',
+            hazardIntensity: 0
+        };
+
+        // events
+        sensor.on('mousedown', function () {
             if (objectSel === 'remove') {
                 setTimeout(function () {
-                    sensorContainer.removeChild(sensorContainer.getChildByName(temp));
+                    sensorContainer.removeChild(sensorContainer.getChildByName(sensorName));
                     sensorCount--;
                 }, 1);
             }
+            if (objectSel === 'cursor') {
+                console.log(sensor);
+                log.msg('sensor ' + count + ' STATE:' + sensor.info.state);
+            }
         });
-        sensorsArr[sensorCount].x = loc.x + 0.5 * rs - .5;
-        sensorsArr[sensorCount].y = loc.y + 0.5 * rs - .5;
-        sensorsArr[sensorCount].scale.x = rs / 16;
-        sensorsArr[sensorCount].scale.y = rs / 16;
-        sensorsArr[sensorCount].anchor.set(0.5, 0.5);
+
+        // -------- Text hover
+        var style = new PIXI.TextStyle({
+            fontSize: 12,
+            fontWeight: 'bold',
+            fill: '#A6E22E',
+            strokeThickness: 2,
+            dropShadowAngle: Math.PI / 6,
+            dropShadowDistance: 6,
+            wordWrap: true,
+            wordWrapWidth: 440
+        });
+        var cage = new PIXI.Container();
+        sensor.on('mouseover', function () {
+            var hoverMsg = new PIXI.Text('name: sensor ' + sensor.info.id + '\nstate: ' + sensor.info.state + '\nhazardDetected:' + sensor.info.hazardDetected + '\nhazardIntensity:' + sensor.info.hazardIntensity + '\nisServer:' + sensor.info.isServer, style);
+            var txtBG = new PIXI.Sprite(PIXI.Texture.WHITE);
+            txtBG.width = hoverMsg.width + 5;
+            txtBG.height = hoverMsg.height + 5;
+            txtBG.tint = 0x000000;
+            txtBG.alpha = 0.5;
+
+            cage.addChild(txtBG, hoverMsg);
+            cage.x = sensor.x;
+            cage.y = sensor.y;
+            if (cage.x > esmWidth - txtBG.width) {
+                txtBG.anchor.set(1, 0);
+                hoverMsg.anchor.set(1, 0);
+            }
+            if (cage.y > esmWidth - txtBG.height) {
+                txtBG.anchor.set(0, 1);
+                hoverMsg.anchor.set(0, 1);
+            }
+            sensorContainer.addChild(cage);
+        });
+        sensor.on('mouseout', function () {
+            sensorContainer.removeChild(cage);
+        });
+        // -------- Text hover
+
         sensorRangeArr[sensorCount] = drawSensorRange(esmWidth / 4, 0x0000FF, 0.4, sensorCount);
-        sensorsArr[sensorCount].addChild(sensorRangeArr[sensorCount]);
+        sensor.addChild(sensorRangeArr[sensorCount]);
+        sensorsArr[sensorCount] = sensor;
         sensorContainer.addChild(sensorsArr[sensorCount]);
         sensorCount++;
     }
@@ -6400,7 +7290,7 @@ $(document).ready(function () {
 
     function evacuate() {
         // scale mainGrid Arr
-        subGrid = (0, _utils.scaleConcat)(mainGrid, subGridScale);
+        // subGrid = scaleConcat(mainGrid, subGridScale);
         var destArr = [];
 
         // find exit points
@@ -6408,7 +7298,7 @@ $(document).ready(function () {
             for (var x = 0; x < mainGrid[y].length; x++) {
                 if (mainGrid[y][x] === mainGridNum.exit) {
                     destArr.push({ x: x, y: y });
-                    log.msg('exit at x:' + log.clr(x, 'monoorange') + ',y:' + log.clr(y, 'monoorange') + ' sourced');
+                    // log.msg(`exit at x:${log.clr(x,'monoorange')},y:${log.clr(y,'monoorange')} sourced`);
                 }
             }
         }
@@ -6417,7 +7307,7 @@ $(document).ready(function () {
         destArr.forEach(function (loc) {
             loc.x *= subGridScale;
             loc.y *= subGridScale;
-            log.msg('scaled exit at x:' + log.clr(loc.x, 'monoorange') + ',y:' + log.clr(loc.y, 'monoorange'));
+            // log.msg(`scaled exit at x:${log.clr(loc.x,'monoorange')},y:${log.clr(loc.y,'monoorange')}`);
         });
 
         if (destArr.length > 0) {
@@ -6445,8 +7335,6 @@ $(document).ready(function () {
         Promise.all(destArr.map(function (o) {
             return findPath(x, y, o.x, o.y);
         })).then(function (values) {
-            console.log('All Paths for Evacuee ' + (index + 1) + ':');
-            console.log(values);
             // sort values ascending order
             values.sort(function (a, b) {
                 return b.length - a.length;
@@ -6465,15 +7353,18 @@ $(document).ready(function () {
 
     function moveEvacuee(index, pathArr) {
         var counter = 0;
-        var i = setInterval(function () {
-            evacueesArr[index].x = pathArr[counter].x * rs / 4;
-            evacueesArr[index].y = pathArr[counter].y * rs / 4;
-            counter++;
-            if (counter === pathArr.length) {
-                clearInterval(i);
-                evacueeContainer.removeChild(evacueesArr[index]);
+        intervalsArrCount++;
+        intervalsArr[intervalsArrCount] = setInterval(function () {
+            if (SIMULATION_STATUS === 'RUNNING') {
+                evacueesArr[index].x = pathArr[counter].x * rs / 4;
+                evacueesArr[index].y = pathArr[counter].y * rs / 4;
+                counter++;
+                if (counter === pathArr.length) {
+                    clearInterval(intervalsArr[intervalsArrCount]);
+                    evacueeContainer.removeChild(evacueesArr[index]);
+                }
             }
-        }, 50);
+        }, 200);
     }
 
     // exits, walls, grids
@@ -6567,8 +7458,8 @@ $(document).ready(function () {
             color = obj.color,
             alpha = obj.alpha,
             width = obj.width;
+        // console.log(len, size, color, alpha, width);
 
-        console.log(len, size, color, alpha, width);
         var lines = new Graphics();
         lines.lineStyle(width, color, alpha);
         lines.moveTo(0, 0);
@@ -6688,6 +7579,196 @@ $(document).ready(function () {
         });
     }
 
+    // algorithm functions
+
+    function createGraphLinks(linkRange, width, color, alpha) {
+        var sensorGraphObj = [];
+        sensorsArr.forEach(function (sensor, i) {
+            var graphLinkCount = 0;
+            sensorsArr.forEach(function (snsr) {
+                if (Math.abs(sensor.x - snsr.x) <= linkRange && Math.abs(sensor.y - snsr.y) <= linkRange) {
+                    graphLinkCount++;
+                    var line = new Graphics();
+                    line.lineStyle(width, color, alpha);
+                    line.moveTo(sensor.x, sensor.y);
+                    line.lineTo(snsr.x, snsr.y);
+                    graphLinkContainer.addChild(line);
+                }
+            });
+            sensor.graphLinkCount = graphLinkCount;
+            sensorGraphObj.push({ graphLinkCount: graphLinkCount, sensorNum: i });
+        });
+
+        console.log(sensorGraphObj);
+        sensorGraphObj.sort(function (a, b) {
+            return b.graphLinkCount - a.graphLinkCount;
+        });
+
+        sensorsArr[sensorGraphObj[0].sensorNum].info.isServer = 'TRUE';
+        var isSensorCircle = new PIXI.Graphics();
+        isSensorCircle.lineStyle(1, 0x0000FF, 1);
+        isSensorCircle.beginFill(color, 0.1);
+        isSensorCircle.drawCircle(sensorsArr[sensorGraphObj[0].sensorNum].x, sensorsArr[sensorGraphObj[0].sensorNum].y, 20);
+        isSensorCircle.endFill();
+        graphLinkContainer.addChild(isSensorCircle);
+    }
+
+    // SEND
+    function heatmapGenerate() {
+        var heatmapInstance = h337.create({
+            backgroundColor: 'rgba(0,0,0,.95)',
+            // custom gradient colors
+            gradient: {
+                // enter n keys between 0 and 1 here
+                // for gradient color customization
+                '.5': 'blue',
+                '.8': 'red',
+                '.95': 'white'
+            },
+            container: document.querySelector('.heatmap')
+        });
+        var subGridCopy = subGrid.map(function (arr) {
+            return arr.slice();
+        });
+        var heatmapDataObjArr = [];
+        for (var y = 0; y < subGridCopy.length; y++) {
+            for (var x = 0; x < subGridCopy[y].length; x++) {
+                if (subGridCopy[y][x] >= 10 && subGridCopy[y][x] <= 40) {
+                    subGridCopy[y][x] = parseInt(subGridCopy[y][x] / 30 * 100);
+                    heatmapDataObjArr.push({ x: x * 4, y: y * 4, value: subGridCopy[y][x] });
+                } else {
+                    subGridCopy[y][x] = 0;
+                    heatmapDataObjArr.push({ x: x * 4, y: y * 4, value: subGridCopy[y][x] });
+                }
+            }
+        }
+
+        var data = {
+            max: 100,
+            min: 0,
+            data: heatmapDataObjArr
+        };
+
+        console.log(JSON.stringify(heatmapDataObjArr));
+        heatmapInstance.setData(data);
+        var c = new fabric.Canvas(canvas, {
+            selection: false,
+            height: 800,
+            width: 800
+        });
+        drawGrid(c);
+        drawObjects(c, subGrid);
+        drawPath(c);
+
+        function drawGrid(c) {
+            var options = {
+                distance: 4,
+                width: c.width,
+                height: c.height,
+                param: {
+                    stroke: "#ebebeb",
+                    strokeWidth: 1,
+                    selectable: false
+                }
+            },
+                gridLen = options.width / options.distance;
+
+            for (var i = 0; i < gridLen; i++) {
+                var distance = i * options.distance,
+                    horizontal = new fabric.Line([distance, 0, distance, options.width], options.param),
+                    vertical = new fabric.Line([0, distance, options.width, distance], options.param);
+                c.add(horizontal);
+                c.add(vertical);
+                if (i % 4 === 0) {
+                    horizontal.set({ stroke: "#cccccc" });
+                    vertical.set({ stroke: "#cccccc" });
+                }
+            }
+        }
+        function drawObjects(c, arr) {
+            arr.forEach(function (row, y) {
+                row.forEach(function (col, x) {
+                    if (col === 4) {
+                        var rect = new fabric.Rect({
+                            width: 4,
+                            height: 4,
+                            fill: "blue",
+                            left: x * 4,
+                            top: y * 4,
+                            objectCaching: false,
+                            hasRotatingPoint: false,
+                            hasControls: false,
+                            hasBorders: false,
+                            selectable: false
+                        });
+                        c.add(rect);
+                    }
+                });
+            });
+        }
+        function drawPath(c) {
+            var destArr = [];
+            // find exit points
+            for (var _y = 0; _y < mainGrid.length; _y++) {
+                for (var _x = 0; _x < mainGrid[_y].length; _x++) {
+                    if (mainGrid[_y][_x] === mainGridNum.exit) {
+                        destArr.push({ x: _x, y: _y });
+                    }
+                }
+            }
+            // get top left corner location in destArr
+            destArr.forEach(function (loc) {
+                loc.x *= 4;
+                loc.y *= 4;
+                // log.msg(`scaled exit at x:${log.clr(loc.x,'monoorange')},y:${log.clr(loc.y,'monoorange')}`);
+            });
+            if (destArr.length > 0) {
+                // if there are any exits on the map
+                easystar.setGrid(JSON.parse(JSON.stringify(subGrid)));
+                easystar.setAcceptableTiles([0, 1, 2, 3, 4, 5, 7, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24]);
+                easystar.enableDiagonals();
+
+                if (evacueesArr.length > 0) {
+                    evacueeStartingPosArr.forEach(function (evacuee, i) {
+                        findEvacPathSEND(c, i, parseInt(evacuee.x / 4), parseInt(evacuee.y / 4), destArr);
+                    });
+                    easystar.calculate();
+                }
+            }
+        }
+        function findEvacPathSEND(c, index, x, y, destArr) {
+            Promise.all(destArr.map(function (o) {
+                return findPath(x, y, o.x, o.y);
+            })).then(function (values) {
+                // sort values ascending order
+
+                values.sort(function (a, b) {
+                    return b.length - a.length;
+                }).reverse();
+                // draw paths
+                values.forEach(function (path, i) {
+                    if (i === 0) {
+                        drawPathLine(c, path, 2, '#00FF00');
+                    } else {
+                        drawPathLine(c, path, 4, '#2196F3');
+                    }
+                });
+            });
+        }
+        function drawPathLine(c, path, width, color) {
+            path.forEach(function (pathEl, i) {
+                if (i < path.length - 1) {
+                    var pathline = new fabric.Line([pathEl.x * 4, pathEl.y * 4, path[i + 1].x * 4, path[i + 1].y * 4], {
+                        stroke: '' + color,
+                        strokeWidth: width,
+                        selectable: false
+                    });
+                    c.add(pathline);
+                }
+            });
+        }
+    }
+
     // -------------------------------------------------------------  EVENTS (general)
     //------------------------------------------ Menu Events
 
@@ -6727,6 +7808,12 @@ $(document).ready(function () {
                 case 'stop_det':
                     clearInterval(detectionInterval);
                     break;
+                case 'enb_graph':
+                    createGraphLinks(300, 2, 0xA6E22E, 0.3);
+                    break;
+                case 'dis_graph':
+                    graphLinkContainer.removeChildren();
+                    break;
                 default:
                     log.msg('cmd: ' + log.clr('erronous cmd!', 'red'));
                     break;
@@ -6739,9 +7826,36 @@ $(document).ready(function () {
         e.preventDefault();
         // clear all paths
         pathContainer.removeChildren();
+
+        //clear hazard
+        mainGrid[hazStartGridPt.y][hazStartGridPt.x] = 0;
+        fireHazardContainer.removeChildren();
+        fireHazardArr = undefined;
         // clear evacuees and count
         evacueesArr = [];evacueesCount = 0;
         log.msg('RESET: all paths cleared!');
+    });
+
+    // reset simulation
+    $('#pause-sim').on('click', function (e) {
+        if ($('#pause-sim').hasClass('paused')) {
+            $('#pause-sim').removeClass('paused');
+            e.preventDefault();
+            log.msg('SIMULATION RUNNING');
+            runHazard(subGrid);
+        } else {
+            $('#pause-sim').addClass('paused');
+            e.preventDefault();
+            // clear all paths
+            SIMULATION_STATUS = 'PAUSED';
+            for (var i = 0; i < intervalsArr.length; i++) {
+                clearInterval(intervalsArr[i]);
+            }
+            log.msg('SIMULATION PAUSED');
+            pauseStatArr = subGrid.map(function (arr) {
+                return arr.slice();
+            });
+        }
     });
 
     // load & save
@@ -6861,6 +7975,7 @@ $(document).ready(function () {
         width: 1200,
         onOpened: function onOpened() {
             addTable(mainGrid, 'disp-scene-arr');
+            heatmapGenerate();
         }
     });
 
@@ -6947,7 +8062,83 @@ $(document).ready(function () {
     });
 });
 
-},{"./utils":9,"easystarjs":3,"moment":6,"rainbowvis.js":7}],9:[function(require,module,exports){
+},{"./pixi.extensions":10,"./utils":11,"easystarjs":3,"heatmap.js":6,"moment":7,"rainbowvis.js":8}],10:[function(require,module,exports){
+'use strict';
+
+Object.defineProperty(exports, "__esModule", {
+    value: true
+});
+
+var _createClass = function () { function defineProperties(target, props) { for (var i = 0; i < props.length; i++) { var descriptor = props[i]; descriptor.enumerable = descriptor.enumerable || false; descriptor.configurable = true; if ("value" in descriptor) descriptor.writable = true; Object.defineProperty(target, descriptor.key, descriptor); } } return function (Constructor, protoProps, staticProps) { if (protoProps) defineProperties(Constructor.prototype, protoProps); if (staticProps) defineProperties(Constructor, staticProps); return Constructor; }; }();
+
+function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
+
+function _possibleConstructorReturn(self, call) { if (!self) { throw new ReferenceError("this hasn't been initialised - super() hasn't been called"); } return call && (typeof call === "object" || typeof call === "function") ? call : self; }
+
+function _inherits(subClass, superClass) { if (typeof superClass !== "function" && superClass !== null) { throw new TypeError("Super expression must either be null or a function, not " + typeof superClass); } subClass.prototype = Object.create(superClass && superClass.prototype, { constructor: { value: subClass, enumerable: false, writable: true, configurable: true } }); if (superClass) Object.setPrototypeOf ? Object.setPrototypeOf(subClass, superClass) : subClass.__proto__ = superClass; }
+
+var SensorSprite = exports.SensorSprite = function (_PIXI$extras$Animated) {
+    _inherits(SensorSprite, _PIXI$extras$Animated);
+
+    function SensorSprite(arg) {
+        _classCallCheck(this, SensorSprite);
+
+        var _this = _possibleConstructorReturn(this, (SensorSprite.__proto__ || Object.getPrototypeOf(SensorSprite)).call(this, arg));
+
+        _this.info = {
+            name: '',
+            state: 'DEFAULT'
+        };
+        return _this;
+    }
+
+    _createClass(SensorSprite, [{
+        key: 'getSensorState',
+        value: function getSensorState() {
+            return this.sensorState;
+        }
+    }]);
+
+    return SensorSprite;
+}(PIXI.extras.AnimatedSprite);
+
+var EvacueeSprite = exports.EvacueeSprite = function (_PIXI$Sprite) {
+    _inherits(EvacueeSprite, _PIXI$Sprite);
+
+    function EvacueeSprite() {
+        _classCallCheck(this, EvacueeSprite);
+
+        return _possibleConstructorReturn(this, (EvacueeSprite.__proto__ || Object.getPrototypeOf(EvacueeSprite)).call(this));
+    }
+
+    return EvacueeSprite;
+}(PIXI.Sprite);
+
+var ExitSprite = exports.ExitSprite = function (_PIXI$Sprite2) {
+    _inherits(ExitSprite, _PIXI$Sprite2);
+
+    function ExitSprite() {
+        _classCallCheck(this, ExitSprite);
+
+        return _possibleConstructorReturn(this, (ExitSprite.__proto__ || Object.getPrototypeOf(ExitSprite)).call(this));
+    }
+
+    return ExitSprite;
+}(PIXI.Sprite);
+
+var FireSprite = exports.FireSprite = function (_PIXI$Sprite3) {
+    _inherits(FireSprite, _PIXI$Sprite3);
+
+    function FireSprite() {
+        _classCallCheck(this, FireSprite);
+
+        return _possibleConstructorReturn(this, (FireSprite.__proto__ || Object.getPrototypeOf(FireSprite)).call(this));
+    }
+
+    return FireSprite;
+}(PIXI.Sprite);
+
+},{}],11:[function(require,module,exports){
 'use strict';
 
 Object.defineProperty(exports, "__esModule", {
@@ -7221,4 +8412,4 @@ var msgTicker = exports.msgTicker = function () {
     return msgTicker;
 }();
 
-},{}]},{},[8]);
+},{}]},{},[9]);

@@ -4,6 +4,7 @@ const easystarjs = require('easystarjs');
 const moment = require('moment');
 const Rainbow = require('rainbowvis.js');
 const rainbow = new Rainbow();
+const h337 = require('heatmap.js');
 
 import {
     loadProgressHandler,
@@ -14,6 +15,13 @@ import {
     msgTicker,
     scaleApply
 } from './utils'
+
+import {
+    SensorSprite,
+    EvacueeSprite,
+    ExitSprite,
+    FireSprite
+} from './pixi.extensions'
 
 // util function
 
@@ -31,7 +39,7 @@ $(document).ready(()=>{
 
     // ------------------------------------------------------------------  logging console
 
-    let log = new msgConsole({
+    const log = new msgConsole({
         id:'messages',
         timeClass: 'mc-cursor-time',
         animated: false,
@@ -39,7 +47,7 @@ $(document).ready(()=>{
         showTime: true
     });
 
-    let tkr = new msgTicker({
+    const tkr = new msgTicker({
         id:'info-feed',
         animated: true,
         animateCssClass: 'fadeIn',
@@ -95,6 +103,7 @@ $(document).ready(()=>{
     let mainGrid = Array(50).fill().map(() => Array(50).fill(0)); // 50 x 50
     let subGrid = []; // 200 x 200
     let subGridCurr = [];
+    let pauseStatArr = [];
     const subGridScale = 4;
 
     let mainGridNum = {floor: 0, evacuee: 2, exit: 4, wall: 8, sensor: 6,};
@@ -103,34 +112,39 @@ $(document).ready(()=>{
 
     // hazards globals
     let hazStart=[]; // starting pos
+    let hazStartGridPt = {};
     let hazardInterval, detectionInterval, fireHazardContainer;
     let fireHazardCount = 0;
     let fireHazardArr = Array(200).fill().map(()=> []);
     let fireColorArr = getSpectrum();
-    console.log('fireColorArr',fireColorArr);
 
     // STAGES
     // create containers
-    let wallContainer, evacueeContainer, sensorContainer, exitContainer, pathContainer;
+    let wallContainer, evacueeContainer, sensorContainer, exitContainer, pathContainer, graphLinkContainer;
 
     // Arrays to keep tracks of display objects
     let evacueesArr = [],
         sensorsArr = [],
         sensorRangeArr = [],
         exitArr = [];
+    let evacueeStartingPosArr = [];
+    // array to keep track of simulation timers
+    let intervalsArr = [];
+    let intervalsArrCount = 0;
+    let SIMULATION_STATUS = 'INIT';
 
     let evacueesCount = 0,
         sensorCount = 0,
         sensorRangeCount = 0,
         exitCount = 0;
 
-    function initContainers ()
-    {
+    function initContainers () {
         wallContainer = new Container();
         evacueeContainer = new Container();
         sensorContainer = new Container();
         exitContainer = new Container();
         pathContainer = new Container();
+        graphLinkContainer = new Container();
         fireHazardContainer = new ParticleContainer(1000000);
         fireHazardContainer.alpha = 0.5;
         fireHazardContainer.autoResize = true;
@@ -140,6 +154,7 @@ $(document).ready(()=>{
         app.stage.addChild(evacueeContainer);
         app.stage.addChild(sensorContainer);
         app.stage.addChild(exitContainer);
+        app.stage.addChild(graphLinkContainer);
         app.stage.addChild(pathContainer);
         app.stage.addChild(fireHazardContainer);
     }
@@ -153,6 +168,7 @@ $(document).ready(()=>{
         exitCount = 0;
         mainGrid = Array(50).fill().map(() => Array(50).fill(0));
         evacueesArr = [];
+        evacueeStartingPosArr = [];
         sensorsArr = [];
         sensorRangeArr = [];
         exitArr = [];
@@ -163,6 +179,7 @@ $(document).ready(()=>{
         app.stage.removeChild(evacueeContainer);
         app.stage.removeChild(sensorContainer);
         app.stage.removeChild(exitContainer);
+        app.stage.removeChild(graphLinkContainer);
         app.stage.removeChild(pathContainer);
         app.stage.removeChild(fireHazardContainer);
     }
@@ -235,6 +252,7 @@ $(document).ready(()=>{
                     evacueesArr[evacueesCount].x = pointer.x - pointer.x%rs + 0.5*rs - .5;
                     evacueesArr[evacueesCount].y = pointer.y - pointer.y%rs + 0.5*rs - .5;
                     evacueesArr[evacueesCount].anchor.set(0.5, 0.5);
+                    evacueeStartingPosArr.push({x:evacueesArr[evacueesCount].x, y:evacueesArr[evacueesCount].y,evacueeNum:evacueesCount});
                     evacueeContainer.addChild(evacueesArr[evacueesCount]);
                     log.msg(`Evacuee ${evacueesCount} added at [${parseInt(evacueesArr[evacueesCount].x/rs)}, ${parseInt(evacueesArr[evacueesCount].y/rs)}] `);
                     evacueesCount++;
@@ -295,7 +313,9 @@ $(document).ready(()=>{
                         x: pointer.x - pointer.x%rs - .5,
                         y: pointer.x - pointer.x%rs - .5
                     });
-                    mainGrid[parseInt(pointer.y/rs)][parseInt(pointer.x/rs)] = 10;
+                    hazStartGridPt.y = parseInt(pointer.y/rs);
+                    hazStartGridPt.x = parseInt(pointer.x/rs);
+                    mainGrid[hazStartGridPt.y][hazStartGridPt.x] = 10;
                     console.log('Fire started!');
                     break;
                 case 'info':
@@ -329,10 +349,6 @@ $(document).ready(()=>{
 
 
     // --------------------------------------------------------------   FUNCTIONS
-
-    function updateGlobalPosArrs () {
-
-    }
 
     // path
 
@@ -368,15 +384,27 @@ $(document).ready(()=>{
 
     function startHazard () {
         subGrid = scaleConcat(mainGrid, subGridScale);
-        // loops
-        detectionInterval = setInterval(()=>{
-            sensorHazardDetection();
-        },500);
-        hazardInterval = setInterval(()=>{
+        runHazard(subGrid);
+    }
+
+    function runHazard(subGrid) {
+        SIMULATION_STATUS = 'RUNNING';
+        intervalsArr[intervalsArrCount++] = setInterval(()=>{
+            pathContainer.removeChildren();
             subGridCurr = subGrid.map(function(arr) {return arr.slice();});
             simulateFire();
-        },5000); // 10 secs fire spread speed
-        
+            sensorHazardDetection();
+            evacuate();
+        },1000); // 10 secs fire spread speed
+
+        function rn(max,min) {
+            return Math.floor(Math.random() * (max - min + 1)) + min;
+        }
+
+        function timeRanger(max, min) {
+            return Math.ceil((Math.floor(Math.random() * (max - min + 1)) + min)/10)*10;
+        }
+
         function simulateFire() {
             for(let y=0; y< subGrid.length; y++) {
                 for(let x=0; x < subGrid[y].length; x++) {
@@ -392,9 +420,11 @@ $(document).ready(()=>{
             let rowLimit = subGrid.length-1;
             let columnLimit = subGrid[0].length-1;
             let neighborArr = [];
+            let pmax = 4,
+                pmin = 1;
 
-            for(let y = Math.max(0, i-1); y <= Math.min(i+1, rowLimit); y++) {
-                for(let x = Math.max(0, j-1); x <= Math.min(j+1, columnLimit); x++) {
+            for(let y = Math.max(0, i-rn(pmax,pmin)); y <= Math.min(i+rn(pmax,pmin), rowLimit); y++) {
+                for(let x = Math.max(0, j-rn(pmax,pmin)); x <= Math.min(j+rn(pmax,pmin), columnLimit); x++) {
                     neighborArr.push({y:y,x:x});
                 }
             }
@@ -403,11 +433,20 @@ $(document).ready(()=>{
 
         function increaseIntensity (neighborArr) {
             neighborArr.forEach((cell)=>{
-                let val = subGrid[cell.y][cell.x];
-                subGrid[cell.y][cell.x] = val === 0 ? 10 :
-                    val >= 10 && val < 40 ? ++val:
-                        val;
-                drawFireSprite(cell.y, cell.x, subGrid[cell.y][cell.x]);
+                if(subGrid[cell.y][cell.x] === 0) {
+                    subGrid[cell.y][cell.x] = 10;
+                    let timeRange = timeRanger(10, 100);
+                    if(SIMULATION_STATUS === 'RUNNING') {
+                        intervalsArrCount++;
+                        intervalsArr[intervalsArrCount] = setInterval(function(){
+                            drawFireSprite(cell.y, cell.x, subGrid[cell.y][cell.x]);
+                            subGrid[cell.y][cell.x]++;
+                            if(subGrid[cell.y][cell.x] === 40){
+                                clearInterval(intervalsArr[intervalsArrCount]);
+                            }
+                        },timeRange);
+                    }
+                }
             });
         }
     }
@@ -417,12 +456,14 @@ $(document).ready(()=>{
             fireHazardArr[y][x] = new Sprite(Texture.WHITE);
             fireHazardArr[y][x].tint = intensityColor(intensity);
             fireHazardArr[y][x].width = rs/subGridScale;
-            fireHazardArr[y][x].height = rs/subGridScale;
+            fireHazardArr[y][x].height = rs;
             fireHazardArr[y][x].y = y * rs/subGridScale;
             fireHazardArr[y][x].x = x * rs/subGridScale;
             fireHazardContainer.addChild(fireHazardArr[y][x]);
+            fireHazardArr[y][x].intensity = intensity;
         } else {
             fireHazardArr[y][x].tint = intensityColor(intensity);
+            fireHazardArr[y][x].intensity = intensity;
         }
 
     }
@@ -435,7 +476,7 @@ $(document).ready(()=>{
         let num = 30;
         let colorArr = [];
         rainbow.setNumberRange(1, num);
-        rainbow.setSpectrum('yellow', 'red','black');
+        rainbow.setSpectrum('#dcdcdc', '#696969','black');
 
         for(let i = 0; i < num; i++ ) {
             let color = rainbow.colourAt(i);
@@ -453,22 +494,83 @@ $(document).ready(()=>{
 
     function sensorHazardDetection () {
         // run a loop that checks if the sensorRange has detected any hazards
-        let hazardDetectedArr=[];
         sensorRangeArr.forEach((sensorRange, i)=>{
+            let hazardIntensityTotal = 0;
+            let hazardCount = 0;
             let hazardDetected = b.hit(
                 sensorRange,
                 fireHazardContainer.children,
                 false, false, true,
                 function(collision, hazardSprite){
-                    console.log('hazardSprite');
-                    console.log(hazardSprite);
+                    if(collision) {
+                        hazardCount++;
+                        hazardIntensityTotal += hazardSprite.intensity;
+                        let hazardIntensityAvg = hazardIntensityTotal/hazardCount;
+                        sensorsArr[i].info.hazardDetected = 'TRUE';
+                        detIntensity(i,hazardIntensityAvg);
+                        function detIntensity (i,state) {
+                            switch(true) {
+                                case (state < 10):
+                                    sensorsArr[i].info.state = 'NORMAL';
+                                    if (sensorsArr[i].info.state !== sensorsArr[i].info.prevState) {
+                                        sensorsArr[i].info.prevState = sensorsArr[i].info.state;
+                                        changeSensorState(i, 'clr');
+                                    }
+                                    break;
+                                case (state <= 15):
+                                    sensorsArr[i].info.state = 'WARN_LOW';
+                                    if (sensorsArr[i].info.state !== sensorsArr[i].info.prevState) {
+                                        sensorsArr[i].info.prevState = sensorsArr[i].info.state;
+                                        changeSensorState(i, 'wl');
+                                    }
+                                    break;
+                                case (state <= 20):
+                                    sensorsArr[i].info.state = 'WARN_MID';
+                                    if (sensorsArr[i].info.state !== sensorsArr[i].info.prevState) {
+                                        sensorsArr[i].info.prevState = sensorsArr[i].info.state;
+                                        changeSensorState(i, 'wm');
+                                    }
+                                    break;
+                                case (state <= 25):
+                                    sensorsArr[i].info.state = 'WARN_HIGH';
+                                    if (sensorsArr[i].info.state !== sensorsArr[i].info.prevState) {
+                                        sensorsArr[i].info.prevState = sensorsArr[i].info.state;
+                                        changeSensorState(i, 'wh');
+                                    }
+                                    break;
+                                case (state <= 30):
+                                    sensorsArr[i].info.state = 'HAZ_LOW';
+                                    if (sensorsArr[i].info.state !== sensorsArr[i].info.prevState) {
+                                        sensorsArr[i].info.prevState = sensorsArr[i].info.state;
+                                        changeSensorState(i, 'hl');
+                                    }
+                                    break;
+                                case (state <= 35):
+                                    sensorsArr[i].info.state = 'HAZ_MID';
+                                    if (sensorsArr[i].info.state !== sensorsArr[i].info.prevState) {
+                                        sensorsArr[i].info.prevState = sensorsArr[i].info.state;
+                                        changeSensorState(i, 'hm');
+                                    }
+                                    break;
+                                case (state <= 40):
+                                    sensorsArr[i].info.state = 'HAZ_HIGH';
+                                    if (sensorsArr[i].info.state !== sensorsArr[i].info.prevState) {
+                                        sensorsArr[i].info.prevState = sensorsArr[i].info.state;
+                                        changeSensorState(i, 'hh');
+                                    }
+                                    break;
+                                default:
+                                    break;
+                            }
+                        }
+                        sensorsArr[i].info.hazardIntensity = hazardIntensityAvg;
+                        tkr.msg(`hazardIntensityAvg | sensor ${i}: ${hazardIntensityAvg}`);
+                    }
+
                 }
             );
-            if(hazardDetected) {
-                hazardDetectedArr.push(i);
-            }
         });
-        tkr.msg(`hazard detected by sensor: ${hazardDetectedArr.toString()}`);
+
     }
 
     function disableSensorNetwork () {
@@ -498,26 +600,32 @@ $(document).ready(()=>{
                 break;
             case 'warnLow':
             case'wl':
+                sensorsArr[sensorNum].info.state = 'WARN_LOW';
                 stateChange(sensorNum,0xFFD700, 1);
                 break;
             case 'warnMid':
             case 'wm':
+                sensorsArr[sensorNum].info.state = 'WARN_MID';
                 stateChange(sensorNum,0xFFA500, 1);
                 break;
             case 'warnHigh':
             case 'wh':
+                sensorsArr[sensorNum].info.state = 'WARN_HIGH';
                 stateChange(sensorNum,0xFF8C00, 1);
                 break;
             case 'hazardLow':
             case 'hl':
+                sensorsArr[sensorNum].info.state = 'HAZ_LOW';
                 stateChange(sensorNum,0xFF6347, 1);
                 break;
             case 'hazardMid':
             case 'hm':
+                sensorsArr[sensorNum].info.state = 'HAZ_MID';
                 stateChange(sensorNum,0xFF4500, 1);
                 break;
             case 'hazardHigh':
             case 'hh':
+                sensorsArr[sensorNum].info.state = 'HAZ_HIGH';
                 stateChange(sensorNum,0xFF0000, 1);
                 break;
             default:
@@ -526,8 +634,6 @@ $(document).ready(()=>{
         }
 
         function stateChange (num, color,alpha) {
-            console.log('srstate change num:',num);
-            console.log(`srstate change color: ${color}`);
             sensorsArr[num].removeChildren();
             sensorRangeArr[num] = drawSensorRange(esmWidth/4, color, alpha, num);
             sensorsArr[num].addChild(sensorRangeArr[num]);
@@ -535,28 +641,86 @@ $(document).ready(()=>{
     }
 
     function newSensor (loc) {
-        sensorsArr[sensorCount] = new AnimatedSprite(animFrameSetter('hazard_sensor_16x16_on', 2)); // on state
-        sensorsArr[sensorCount].interactive = true;
-        sensorsArr[sensorCount].animationSpeed = 0.3;
-        sensorsArr[sensorCount].play();
+        let sensor = new SensorSprite(animFrameSetter('hazard_sensor_16x16_on', 2)); // on state
+        let sensorName = `sensorsArr[${sensorCount}]`;
+        let count = sensorCount;
 
-        let temp = `sensorsArr[${sensorCount}]`;
-        sensorsArr[sensorCount].name = temp;
-        sensorsArr[sensorCount].on('mousedown',() => {
+        // sprite settings, position, scale, anchor
+        sensor.interactive = true;
+        sensor.animationSpeed = 0.3;
+        sensor.play();
+        sensor.x = loc.x + 0.5*rs - .5;
+        sensor.y = loc.y + 0.5*rs - .5;
+        sensor.scale.x = rs/16;
+        sensor.scale.y = rs/16;
+        sensor.anchor.set(0.5, 0.5);
+
+        // sensor settings
+        sensor.info = {
+            name: sensorName,
+            id: sensorCount,
+            prevState: 'INITIAL',
+            state: 'NORMAL',
+            isServer: 'FALSE',
+            hazardDetected:'FALSE',
+            hazardIntensity:0
+        };
+
+        // events
+        sensor.on('mousedown',() => {
             if (objectSel === 'remove') {
                 setTimeout(function () {
-                    sensorContainer.removeChild(sensorContainer.getChildByName(temp));
+                    sensorContainer.removeChild(sensorContainer.getChildByName(sensorName));
                     sensorCount--;
                 }, 1);
             }
+            if (objectSel === 'cursor') {
+                console.log(sensor);
+                log.msg(`sensor ${count} STATE:${sensor.info.state}`)
+            }
         });
-        sensorsArr[sensorCount].x = loc.x + 0.5*rs - .5;
-        sensorsArr[sensorCount].y = loc.y + 0.5*rs - .5;
-        sensorsArr[sensorCount].scale.x = rs/16;
-        sensorsArr[sensorCount].scale.y = rs/16;
-        sensorsArr[sensorCount].anchor.set(0.5, 0.5);
+
+        // -------- Text hover
+        let style = new PIXI.TextStyle({
+            fontSize: 12,
+            fontWeight: 'bold',
+            fill: '#A6E22E',
+            strokeThickness: 2,
+            dropShadowAngle: Math.PI / 6,
+            dropShadowDistance: 6,
+            wordWrap: true,
+            wordWrapWidth: 440
+        });
+        let cage = new PIXI.Container();
+        sensor.on('mouseover', ()=>{
+            let hoverMsg = new PIXI.Text(`name: sensor ${sensor.info.id}\nstate: ${sensor.info.state}\nhazardDetected:${sensor.info.hazardDetected}\nhazardIntensity:${sensor.info.hazardIntensity}\nisServer:${sensor.info.isServer}`, style);
+            let txtBG = new PIXI.Sprite(PIXI.Texture.WHITE);
+            txtBG.width = hoverMsg.width + 5;
+            txtBG.height = hoverMsg.height + 5;
+            txtBG.tint = 0x000000;
+            txtBG.alpha = 0.5;
+
+            cage.addChild(txtBG,hoverMsg);
+            cage.x = sensor.x;
+            cage.y = sensor.y;
+            if (cage.x > esmWidth - txtBG.width) {
+                txtBG.anchor.set(1, 0);
+                hoverMsg.anchor.set(1, 0);
+            }
+            if (cage.y > esmWidth - txtBG.height) {
+                txtBG.anchor.set(0, 1);
+                hoverMsg.anchor.set(0, 1);
+            }
+            sensorContainer.addChild(cage);
+        });
+        sensor.on('mouseout', ()=>{
+            sensorContainer.removeChild(cage);
+        });
+        // -------- Text hover
+
         sensorRangeArr[sensorCount] = drawSensorRange(esmWidth/4, 0x0000FF, 0.4, sensorCount);
-        sensorsArr[sensorCount].addChild(sensorRangeArr[sensorCount]);
+        sensor.addChild(sensorRangeArr[sensorCount]);
+        sensorsArr[sensorCount] = sensor;
         sensorContainer.addChild(sensorsArr[sensorCount]);
         sensorCount++;
     }
@@ -617,7 +781,7 @@ $(document).ready(()=>{
 
     function evacuate ()  {
         // scale mainGrid Arr
-        subGrid = scaleConcat(mainGrid, subGridScale);
+        // subGrid = scaleConcat(mainGrid, subGridScale);
         let destArr = [];
 
         // find exit points
@@ -625,7 +789,7 @@ $(document).ready(()=>{
             for(let x = 0; x < mainGrid[y].length; x++) {
                 if (mainGrid[y][x] === mainGridNum.exit){
                     destArr.push({x:x,y:y});
-                    log.msg(`exit at x:${log.clr(x,'monoorange')},y:${log.clr(y,'monoorange')} sourced`);
+                    // log.msg(`exit at x:${log.clr(x,'monoorange')},y:${log.clr(y,'monoorange')} sourced`);
                 }
             }
         }
@@ -634,7 +798,7 @@ $(document).ready(()=>{
         destArr.forEach((loc)=>{
             loc.x *= subGridScale;
             loc.y *= subGridScale;
-            log.msg(`scaled exit at x:${log.clr(loc.x,'monoorange')},y:${log.clr(loc.y,'monoorange')}`);
+            // log.msg(`scaled exit at x:${log.clr(loc.x,'monoorange')},y:${log.clr(loc.y,'monoorange')}`);
         });
 
         if (destArr.length > 0) { // if there are any exits on the map
@@ -664,8 +828,6 @@ $(document).ready(()=>{
         Promise.all(
             destArr.map(o => findPath(x, y, o.x, o.y))
         ).then(values => {
-            console.log(`All Paths for Evacuee ${index + 1}:`);
-            console.log(values);
             // sort values ascending order
             values.sort(function (a, b) {
                 return b.length - a.length;
@@ -684,15 +846,18 @@ $(document).ready(()=>{
 
     function moveEvacuee(index, pathArr) {
         let counter = 0;
-        let i = setInterval(() => {
-            evacueesArr[index].x = pathArr[counter].x *rs/4;
-            evacueesArr[index].y = pathArr[counter].y *rs/4;
-            counter++;
-            if(counter === pathArr.length) {
-                clearInterval(i);
-                evacueeContainer.removeChild(evacueesArr[index]);
-            }
-        },50);
+            intervalsArrCount++;
+            intervalsArr[intervalsArrCount] = setInterval(() => {
+                if(SIMULATION_STATUS === 'RUNNING') {
+                    evacueesArr[index].x = pathArr[counter].x *rs/4;
+                    evacueesArr[index].y = pathArr[counter].y *rs/4;
+                    counter++;
+                    if(counter === pathArr.length) {
+                        clearInterval(intervalsArr[intervalsArrCount]);
+                        evacueeContainer.removeChild(evacueesArr[index]);
+                    }
+                }
+            },200);
     }
 
     // exits, walls, grids
@@ -782,7 +947,7 @@ $(document).ready(()=>{
 
     function drawGrid (obj) {
         let {len, size, color, alpha, width} = obj;
-        console.log(len, size, color, alpha, width);
+        // console.log(len, size, color, alpha, width);
         let lines = new Graphics();
         lines.lineStyle (width, color, alpha);
         lines.moveTo(0, 0);
@@ -912,6 +1077,203 @@ $(document).ready(()=>{
         });
     }
 
+    // algorithm functions
+
+    function createGraphLinks(linkRange, width, color, alpha) {
+        let sensorGraphObj = [];
+        sensorsArr.forEach((sensor,i) => {
+            let graphLinkCount = 0;
+            sensorsArr.forEach((snsr)=>{
+                if(Math.abs(sensor.x - snsr.x) <= linkRange && Math.abs(sensor.y - snsr.y) <= linkRange){
+                    graphLinkCount++;
+                    let line = new Graphics();
+                    line.lineStyle (width, color, alpha);
+                    line.moveTo(sensor.x, sensor.y);
+                    line.lineTo(snsr.x, snsr.y);
+                    graphLinkContainer.addChild(line);
+                }
+            });
+            sensor.graphLinkCount = graphLinkCount;
+            sensorGraphObj.push({graphLinkCount:graphLinkCount, sensorNum:i})
+        });
+
+        console.log(sensorGraphObj);
+        sensorGraphObj.sort(function(a,b){
+            return b.graphLinkCount - a.graphLinkCount;
+        });
+
+        sensorsArr[sensorGraphObj[0].sensorNum].info.isServer = 'TRUE';
+        let isSensorCircle = new PIXI.Graphics();
+        isSensorCircle.lineStyle(1, 0x0000FF, 1);
+        isSensorCircle.beginFill(color, 0.1);
+        isSensorCircle.drawCircle(sensorsArr[sensorGraphObj[0].sensorNum].x, sensorsArr[sensorGraphObj[0].sensorNum].y, 20);
+        isSensorCircle.endFill();
+        graphLinkContainer.addChild(isSensorCircle);
+    }
+
+    // SEND
+    function heatmapGenerate() {
+        const heatmapInstance = h337.create({
+            backgroundColor: 'rgba(0,0,0,.95)',
+            // custom gradient colors
+            gradient: {
+                // enter n keys between 0 and 1 here
+                // for gradient color customization
+                '.5': 'blue',
+                '.8': 'red',
+                '.95': 'white'
+            },
+            container: document.querySelector('.heatmap')
+        });
+        let subGridCopy = subGrid.map(function(arr) {return arr.slice();});
+        let heatmapDataObjArr = [];
+        for(let y =0; y < subGridCopy.length; y++) {
+           for(let x =0; x < subGridCopy[y].length; x++) {
+               if(subGridCopy[y][x] >= 10 && subGridCopy[y][x] <= 40){
+                   subGridCopy[y][x] = parseInt((subGridCopy[y][x]/30) * 100);
+                   heatmapDataObjArr.push({x:x*4,y:y*4,value:subGridCopy[y][x]});
+               } else {
+                   subGridCopy[y][x] = 0;
+                   heatmapDataObjArr.push({x:x*4,y:y*4,value:subGridCopy[y][x]});
+               }
+           }
+        }
+
+        let data = {
+            max: 100,
+            min:0,
+            data: heatmapDataObjArr
+        };
+
+        console.log(JSON.stringify(heatmapDataObjArr));
+        heatmapInstance.setData(data);
+        const c = new fabric.Canvas(canvas, {
+            selection: false,
+            height: 800,
+            width: 800,
+        });
+        drawGrid(c);
+        drawObjects(c,subGrid);
+        drawPath(c);
+
+        function drawGrid(c) {
+            const options = {
+                    distance: 4,
+                    width: c.width,
+                    height: c.height,
+                    param: {
+                        stroke: "#ebebeb",
+                        strokeWidth: 1,
+                        selectable: false
+                    }
+                },
+                gridLen = options.width / options.distance;
+
+            for (let i = 0; i < gridLen; i++) {
+                let distance = i * options.distance,
+                    horizontal = new fabric.Line(
+                        [distance, 0, distance, options.width],
+                        options.param
+                    ),
+                    vertical = new fabric.Line(
+                        [0, distance, options.width, distance],
+                        options.param
+                    );
+                c.add(horizontal);
+                c.add(vertical);
+                if (i % 4 === 0) {
+                    horizontal.set({ stroke: "#cccccc" });
+                    vertical.set({ stroke: "#cccccc" });
+                }
+            }
+        }
+        function drawObjects(c, arr) {
+            arr.forEach((row, y) => {
+                row.forEach((col, x) => {
+                    if (col === 4) {
+                        let rect = new fabric.Rect({
+                            width: 4,
+                            height: 4,
+                            fill: "blue",
+                            left: x*4,
+                            top: y*4,
+                            objectCaching:false,
+                            hasRotatingPoint:false,
+                            hasControls:false,
+                            hasBorders:false,
+                            selectable:false
+                        });
+                        c.add(rect)
+                    }
+                });
+            });
+        }
+        function drawPath(c){
+            let destArr = [];
+            // find exit points
+            for(let y = 0; y < mainGrid.length; y++) {
+                for(let x = 0; x < mainGrid[y].length; x++) {
+                    if (mainGrid[y][x] === mainGridNum.exit){
+                        destArr.push({x:x,y:y});
+                    }
+                }
+            }
+            // get top left corner location in destArr
+            destArr.forEach((loc)=>{
+                loc.x *= 4;
+                loc.y *= 4;
+                // log.msg(`scaled exit at x:${log.clr(loc.x,'monoorange')},y:${log.clr(loc.y,'monoorange')}`);
+            });
+            if (destArr.length > 0) { // if there are any exits on the map
+                easystar.setGrid(JSON.parse(JSON.stringify(subGrid)));
+                easystar.setAcceptableTiles([0, 1, 2, 3, 4, 5, 7, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24]);
+                easystar.enableDiagonals();
+
+                if (evacueesArr.length > 0) {
+                    evacueeStartingPosArr.forEach((evacuee, i)=>{
+                        findEvacPathSEND(c,i, parseInt(evacuee.x/4) , parseInt(evacuee.y/4) , destArr);
+                    });
+                    easystar.calculate();
+                }
+            }
+        }
+        function findEvacPathSEND (c,index, x, y, destArr) {
+            Promise.all(
+                destArr.map(o => findPath(x, y, o.x, o.y))
+            ).then(values => {
+                // sort values ascending order
+
+                values.sort(function (a, b) {
+                    return b.length - a.length;
+                }).reverse();
+                // draw paths
+                values.forEach((path, i) => {
+                    if (i === 0) {
+                        drawPathLine(c,path,2,'#00FF00');
+                    } else {
+                        drawPathLine(c,path,4,'#2196F3');
+                    }
+                })
+            });
+        }
+        function drawPathLine(c,path, width, color){
+            path.forEach((pathEl, i)=>{
+                if(i < path.length -1){
+                    let pathline = new fabric.Line(
+                        [pathEl.x*4, pathEl.y*4, path[i+1].x*4, path[i+1].y*4],{
+                            stroke: `${color}`,
+                            strokeWidth: width,
+                            selectable: false
+                        });
+                    c.add(pathline);
+                }
+
+            })
+
+        }
+
+    }
+
 
     // -------------------------------------------------------------  EVENTS (general)
     //------------------------------------------ Menu Events
@@ -960,6 +1322,12 @@ $(document).ready(()=>{
                 case 'stop_det':
                     clearInterval(detectionInterval);
                     break;
+                case 'enb_graph':
+                    createGraphLinks(300, 2, 0xA6E22E, 0.3);
+                    break;
+                case 'dis_graph':
+                    graphLinkContainer.removeChildren();
+                    break;
                 default:
                     log.msg(`cmd: ${log.clr('erronous cmd!','red')}`);
                     break;
@@ -972,11 +1340,36 @@ $(document).ready(()=>{
         e.preventDefault();
         // clear all paths
         pathContainer.removeChildren();
+
+        //clear hazard
+        mainGrid[hazStartGridPt.y][hazStartGridPt.x] = 0;
+        fireHazardContainer.removeChildren();
+        fireHazardArr = undefined;
         // clear evacuees and count
         evacueesArr = [];evacueesCount = 0;
         log.msg(`RESET: all paths cleared!`);
     });
 
+    // reset simulation
+    $('#pause-sim').on('click', (e) => {
+        if($('#pause-sim').hasClass('paused')){
+            $('#pause-sim').removeClass('paused');
+            e.preventDefault();
+            log.msg(`SIMULATION RUNNING`);
+            runHazard(subGrid);
+        }else {
+            $('#pause-sim').addClass('paused');
+            e.preventDefault();
+            // clear all paths
+            SIMULATION_STATUS = 'PAUSED';
+            for(let i = 0; i < intervalsArr.length; i++) {
+                clearInterval(intervalsArr[i]);
+            }
+            log.msg(`SIMULATION PAUSED`);
+            pauseStatArr = subGrid.map(function(arr) {return arr.slice();});
+        }
+
+    });
 
     // load & save
     $('.esm-btn').on('click', (e) => {
@@ -1095,6 +1488,7 @@ $(document).ready(()=>{
         width:1200,
         onOpened: () => {
             addTable(mainGrid, 'disp-scene-arr');
+            heatmapGenerate();
         }
     });
 

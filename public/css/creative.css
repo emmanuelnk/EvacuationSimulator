@@ -393,3 +393,22 @@ section.masthead p {
     padding-top: 3px;
     font-size: 16px;
 }
+
+/*****************/
+#c-container{
+  position: relative;
+}
+
+.heatmap{
+  border:black solid 1px;
+  width:800px;
+  height:800px;
+  position:absolute;
+  top:0;
+}
+.heatmap-canvas{
+  width:800px;
+  height:800px;
+  position:absolute;
+  top:0;
+}
